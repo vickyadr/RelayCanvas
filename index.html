@@ -1,0 +1,42 @@
+<!doctype html>
+<html lang="id">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>RelayCanvas</title>
+<link rel="stylesheet" href="./style.css">
+</head>
+<body>
+<header>
+  <h1>RelayCanvas</h1>
+  <div class="group">
+    <button data-tool="select" class="on" title="Pilih dan geser (V)">Pilih</button>
+    <button data-tool="wire" title="Tarik kabel (W)">Kabel</button>
+  </div>
+  <div class="group">
+    <button id="run" title="Jalankan simulasi">Run</button>
+    <button id="pause" title="Hentikan sementara, state tetap">Pause</button>
+    <button id="reset" title="Kosongkan hasil">Reset</button>
+  </div>
+  <div class="group">
+    <button id="save">Simpan</button>
+    <button id="load">Muat</button>
+    <button id="demo" title="Muat sketsa acuan">Contoh</button>
+    <input id="file" type="file" accept=".rly,.json" hidden>
+  </div>
+  <span id="status" class="status">siap</span>
+</header>
+
+<main>
+  <aside id="palette" aria-label="Komponen"></aside>
+  <div id="stage">
+    <svg id="canvas" width="1800" height="1100"></svg>
+  </div>
+  <aside id="panel" aria-label="Properti"></aside>
+</main>
+
+<p class="hint">Klik komponen di kiri lalu klik kanvas. Kabel: tombol Kabel, klik pin lalu pin lain. R untuk rotasi, Del hapus, Esc batal.</p>
+
+<script type="module" src="./main.js"></script>
+</body>
+</html>

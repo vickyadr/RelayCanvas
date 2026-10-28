@@ -1,0 +1,138 @@
+:root {
+  --bg: #080d0b;
+  --panel: #0d1512;
+  --line: #1d2f28;
+  --rail: #5eead4;
+  --wire: #3f5b52;
+  --live: #34d399;
+  --dead: #6b8b80;
+  --lime: #a3e635;
+  --txt: #d7f5e9;
+  --muted: #7d9a90;
+  --warn: #fbbf24;
+  --bad: #f87171;
+}
+
+* { box-sizing: border-box; }
+html, body { margin: 0; height: 100%; }
+body {
+  background: var(--bg);
+  color: var(--txt);
+  font: 13px/1.45 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  display: grid;
+  grid-template-rows: auto 1fr auto;
+  height: 100vh;
+  overflow: hidden;
+}
+
+header {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 8px 14px;
+  border-bottom: 1px solid var(--line);
+  background: #0a1210;
+}
+header h1 {
+  font-size: 13px;
+  letter-spacing: 0.08em;
+  margin: 0;
+  text-transform: uppercase;
+}
+.group { display: flex; gap: 6px; }
+button {
+  background: #0b1915;
+  color: var(--txt);
+  border: 1px solid #274238;
+  border-radius: 5px;
+  padding: 6px 10px;
+  font: inherit;
+  font-size: 11.5px;
+  cursor: pointer;
+}
+button:hover { border-color: var(--dead); }
+button.on { border-color: var(--live); color: #062c22; background: var(--live); }
+.status { margin-left: auto; color: var(--muted); font-size: 11.5px; }
+.status.bad { color: var(--bad); }
+.status.warn { color: var(--warn); }
+
+main { display: grid; grid-template-columns: 132px 1fr 262px; min-height: 0; }
+
+#palette, #panel {
+  background: var(--panel);
+  border-right: 1px solid var(--line);
+  padding: 10px;
+  overflow: auto;
+}
+#panel { border-right: 0; border-left: 1px solid var(--line); }
+
+#palette h2, #panel h2 {
+  font-size: 10px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--lime);
+  margin: 0 0 8px;
+}
+#palette button { width: 100%; margin-bottom: 5px; text-align: left; }
+
+#stage {
+  overflow: auto;
+  background-color: var(--bg);
+  background-image:
+    linear-gradient(var(--line) 1px, transparent 1px),
+    linear-gradient(90deg, var(--line) 1px, transparent 1px);
+  background-size: 20px 20px;
+}
+#canvas { display: block; }
+#canvas .bg { fill: transparent; }
+#canvas .wire { fill: none; stroke: var(--wire); stroke-width: 2.4; stroke-linecap: round; }
+#canvas .wire.live { stroke: var(--live); }
+#canvas .wire.sel { stroke: var(--lime); stroke-dasharray: 6 4; }
+#canvas .handle { fill: #0a1210; stroke: var(--lime); stroke-width: 2; cursor: crosshair; }
+#canvas .rail { fill: none; stroke: var(--rail); stroke-width: 3.6; stroke-linecap: round; }
+#canvas .sym { fill: none; stroke: var(--dead); stroke-width: 2; stroke-linecap: round; }
+#canvas .sym.live { stroke: var(--live); }
+#canvas .box { fill: #0c1a16; stroke: var(--dead); stroke-width: 2; }
+#canvas .box.live { stroke: var(--live); fill: #0f2a22; }
+#canvas .box.failed { stroke: var(--bad); fill: #2a1212; }
+#canvas .led-on { fill: #fbbf24; stroke: #fde68a; stroke-width: 2; filter: drop-shadow(0 0 6px #fbbf24); }
+#canvas .pin { fill: #0a1210; stroke: #4b6b60; stroke-width: 1.4; }
+#canvas .pin:hover { stroke: var(--lime); fill: #123; }
+#canvas .tap { fill: transparent; }
+#canvas .hit { fill: transparent; }
+#canvas .marquee { fill: rgba(163, 230, 53, 0.10); stroke: var(--lime); stroke-width: 1; stroke-dasharray: 4 3; }
+#canvas .label { fill: #b9d8cd; font-size: 11px; }
+#canvas .value { fill: var(--muted); font-size: 10px; }
+#canvas .sel { fill: none; stroke: var(--lime); stroke-width: 1; stroke-dasharray: 4 3; }
+#canvas .ghost { fill: none; stroke: var(--lime); stroke-width: 1.6; stroke-dasharray: 5 4; }
+#canvas .dot { fill: #0a1210; stroke: var(--dead); stroke-width: 2; }
+
+#panel .row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+  padding: 3px 0;
+}
+#panel .row span { color: var(--muted); font-size: 11.5px; }
+#panel input, #panel select {
+  background: #08120f;
+  color: var(--txt);
+  border: 1px solid #274238;
+  border-radius: 4px;
+  padding: 3px 6px;
+  font: inherit;
+  font-size: 11.5px;
+  width: 104px;
+}
+#panel input[type="checkbox"] { width: auto; }
+#panel .empty { color: var(--muted); font-size: 11.5px; }
+#panel .hintline { color: var(--muted); font-size: 10.5px; line-height: 1.5; margin: 8px 0 0; }
+
+body > .hint {
+  margin: 0;
+  padding: 6px 14px;
+  border-top: 1px solid var(--line);
+  color: var(--muted);
+  font-size: 11px;
+}
