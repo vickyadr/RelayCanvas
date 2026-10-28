@@ -7,22 +7,22 @@ export const KINDS = {
   rail: {
     label: 'Rail',
     pins: [[-RAIL_HALF, 0], [RAIL_HALF, 0]],
-    props: { v: 24, ac: false, f: 50, rsrc: 0.1, len: 320 }
+    props: { v: 24, ac: false, f: 50, rsrc: 0.1, len: 320, label: '' }
   },
   switch: {
     label: 'Saklar',
     pins: [[0, -PIN_HALF], [0, PIN_HALF]],
-    props: { closed: false, owner: '', nc: false }
+    props: { closed: false, owner: '', nc: false, label: '' }
   },
   passive: {
     label: 'Resistor',
     pins: [[0, -PIN_HALF], [0, PIN_HALF]],
-    props: { r: 2400, c: 0, rating: 0 }
+    props: { r: 2400, c: 0, rating: 0, label: '' }
   },
   coil: {
     label: 'Relay',
     pins: [[0, -PIN_HALF], [0, PIN_HALF]],
-    props: { r: 2400, pickup: 18, release: 6, ton: 0.01, toff: 0, rating: 0 }
+    props: { r: 2400, pickup: 18, release: 6, ton: 0, toff: 0, rating: 0, label: '' }
   },
   out: {
     label: 'Output',
@@ -32,7 +32,7 @@ export const KINDS = {
   led: {
     label: 'LED',
     pins: [[0, -PIN_HALF], [0, PIN_HALF]],
-    props: { r: 1200, rating: 0 }
+    props: { r: 1200, rating: 0, label: '' }
   }
 };
 

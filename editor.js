@@ -48,6 +48,7 @@ export class Editor {
     this.selectedWire = null;
     this.selection = new Set();
     this.marquee = null;
+    this.pan = null;
     this.wireStart = null;
     this.wireDrag = null;
     this.drag = null;
@@ -56,6 +57,9 @@ export class Editor {
     this.placeProps = null;
     this.history = [];
 
+    // middle drag pans the scroll container; also stops the browser autoscroll
+    svg.addEventListener('mousedown', (e) => { if (e.button === 1) e.preventDefault(); });
+    svg.addEventListener('auxclick', (e) => { if (e.button === 1) e.preventDefault(); });
     svg.addEventListener('pointerdown', (e) => this.onDown(e));
     svg.addEventListener('pointermove', (e) => this.onMove(e));
     svg.addEventListener('pointerup', (ev) => this.onUp(ev));
@@ -98,15 +102,15 @@ export class Editor {
     this.select(null);
   }
 
-  mutate(fn) {
-    this.snapshot();
+  mutate(fn, opts) {
+    if (!opts || !opts.noSnapshot) this.snapshot();
     fn(this.doc);
-    this.changed();
+    this.changed(opts);
   }
 
-  changed() {
+  changed(opts) {
     this.render();
-    if (this.hooks.onChange) this.hooks.onChange();
+    if (this.hooks.onChange) this.hooks.onChange(opts);
   }
 
   render() {
@@ -247,6 +251,13 @@ export class Editor {
   }
 
   onDown(e) {
+    if (e.button === 1) {
+      e.preventDefault();
+      const stage = this.svg.parentElement;
+      this.pan = { x: e.clientX, y: e.clientY, left: stage.scrollLeft, top: stage.scrollTop };
+      return;
+    }
+    if (e.pointerType === 'mouse' && e.button !== 0) return;
     const pt = this.point(e);
     const handleEl = e.target.closest('[data-handle]');
     const wireEl = e.target.closest('[data-wire]');
@@ -311,6 +322,12 @@ export class Editor {
   }
 
   onMove(e) {
+    if (this.pan) {
+      const stage = this.svg.parentElement;
+      stage.scrollLeft = this.pan.left - (e.clientX - this.pan.x);
+      stage.scrollTop = this.pan.top - (e.clientY - this.pan.y);
+      return;
+    }
     if (this.drag) {
       if (!this.drag.moved) {
         this.snapshot();
@@ -344,6 +361,10 @@ export class Editor {
   }
 
   onUp(e) {
+    if (this.pan) {
+      this.pan = null;
+      return;
+    }
     if (this.wireDrag) {
       const { wireId, end } = this.wireDrag;
       this.wireDrag = null;

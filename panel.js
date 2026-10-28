@@ -76,10 +76,21 @@ export function renderPanel(root, doc, editor) {
       if (f.type === 'number') input.step = 'any';
     }
 
-    input.addEventListener('change', () => {
-      const value = input.type === 'checkbox' ? input.checked : input.value;
-      editor.mutate(() => f.apply(value));
-    });
+    // text fields update while typing; numbers wait for a committed value so a
+    // half typed "24" is not applied as "2"
+    const live = f.type === 'text';
+    if (live) {
+      // one undo step per editing session, not one per keystroke
+      input.addEventListener('focus', () => editor.snapshot());
+      input.addEventListener('input', () => {
+        editor.mutate(() => f.apply(input.value), { noSnapshot: true, keepFocus: true });
+      });
+    } else {
+      input.addEventListener('change', () => {
+        const value = input.type === 'checkbox' ? input.checked : input.value;
+        editor.mutate(() => f.apply(value));
+      });
+    }
 
     row.append(input);
     root.append(row);
@@ -91,7 +102,8 @@ function fieldDefs(part, doc) {
   const common = [
     { label: 'x', type: 'number', value: part.x, apply: v => { part.x = Math.round(Number(v)); } },
     { label: 'y', type: 'number', value: part.y, apply: v => { part.y = Math.round(Number(v)); } },
-    { label: 'rot', type: 'number', value: part.rot || 0, apply: v => { part.rot = ((Math.round(Number(v)) % 360) + 360) % 360; } }
+    { label: 'rot', type: 'number', value: part.rot || 0, apply: v => { part.rot = ((Math.round(Number(v)) % 360) + 360) % 360; } },
+    { label: 'label', type: 'text', value: part.props.label || '', apply: v => { part.props.label = String(v).trim(); } }
   ];
 
   if (part.kind === 'rail') {
@@ -112,7 +124,7 @@ function fieldDefs(part, doc) {
   }
 
   if (part.kind === 'switch') {
-    const coils = doc.parts.filter(x => x.kind === 'coil').map(c => ({ value: c.id, label: c.id }));
+    const coils = doc.parts.filter(x => x.kind === 'coil').map(c => ({ value: c.id, label: c.props.label || c.id }));
     return [
       ...common,
       { label: 'closed', type: 'check', value: p.closed, apply: v => { p.closed = !!v; } },
@@ -136,15 +148,15 @@ function fieldDefs(part, doc) {
       { label: 'R', type: 'number', value: p.r, apply: v => { p.r = Math.max(0.01, Number(v)); } },
       { label: 'pickup V', type: 'number', value: p.pickup, apply: v => { p.pickup = Number(v); } },
       { label: 'release V', type: 'number', value: p.release, apply: v => { p.release = Number(v); } },
-      { label: 'tOperate ms', type: 'number', value: Math.round(p.ton * 1000), apply: v => { p.ton = Math.max(0, Number(v)) / 1000; } },
-      { label: 'tRelease ms', type: 'number', value: Math.round(p.toff * 1000), apply: v => { p.toff = Math.max(0, Number(v)) / 1000; } },
+      // closing is delayed by `ton`, and the whole output can be held by `toff`
+      { label: 'tutup ms', type: 'number', value: Math.round(p.ton * 1000), apply: v => { p.ton = Math.max(0, Number(v)) / 1000; } },
+      { label: 'tahan ms', type: 'number', value: Math.round((p.toff || 0) * 1000), apply: v => { p.toff = Math.max(0, Number(v)) / 1000; } },
       { label: 'rating A', type: 'number', value: p.rating || 0, apply: v => { p.rating = Math.max(0, Number(v)); } }
     ];
   }
 
   return [
     ...common,
-    { label: 'R', type: 'number', value: p.r, apply: v => { p.r = Math.max(0.01, Number(v)); } },
-    { label: 'label', type: 'text', value: p.label || part.id, apply: v => { p.label = String(v); } }
+    { label: 'R', type: 'number', value: p.r, apply: v => { p.r = Math.max(0.01, Number(v)); } }
   ];
 }

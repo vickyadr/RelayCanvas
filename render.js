@@ -275,7 +275,7 @@ function drawPart(layer, doc, part, view) {
   if (part.kind === 'rail') {
     node('line', { x1: -half, y1: 0, x2: half, y2: 0, class: 'rail' }, g);
     const label = node('text', { x: -half, y: -9, class: 'label' }, g);
-    label.textContent = `${part.id}  ${part.props.v} ${part.props.ac ? 'VAC ' + part.props.f + ' Hz' : 'VDC'}`;
+    label.textContent = `${part.props.label || part.id}  ${part.props.v} ${part.props.ac ? 'VAC ' + part.props.f + ' Hz' : 'VDC'}`;
   }
 
   if (part.kind === 'switch') {
@@ -291,7 +291,9 @@ function drawPart(layer, doc, part, view) {
     node('circle', { cx: 0, cy: 6, r: 2.6, class: 'dot' }, g);
     const tip = closed ? (nc ? [14, -11] : [0, -11]) : [15, -12];
     node('line', { x1: 0, y1: 6, x2: tip[0], y2: tip[1], class: symClass }, g);
-    const name = part.props.owner ? part.props.owner + (nc ? ' NC' : ' NO') : 'SW ' + part.id;
+    const ownerPart = part.props.owner ? doc.parts.find(x => x.id === part.props.owner) : null;
+    const ownerName = ownerPart ? (ownerPart.props.label || ownerPart.id) : part.props.owner;
+    const name = part.props.label || (part.props.owner ? ownerName + (nc ? ' NC' : ' NO') : 'SW ' + part.id);
     const t = node('text', { x: nc ? 24 : 18, y: 3, class: 'label' }, g);
     t.textContent = name;
   }
@@ -302,7 +304,7 @@ function drawPart(layer, doc, part, view) {
     if (Number(part.props.ton) > 0) box.setAttribute('stroke-dasharray', '4 3');
     node('path', { d: 'M -13 8 q 6.5 -16 13 0 q 6.5 -16 13 0', class: symClass }, g);
     const t = node('text', { x: 29, y: -6, class: 'label' }, g);
-    t.textContent = part.id;
+    t.textContent = part.props.label || part.id;
     if (Number(part.props.ton) > 0) {
       const b = node('text', { x: 29, y: 11, class: 'value' }, g);
       b.textContent = 'T ' + Math.round(Number(part.props.ton) * 1000) + ' ms';
@@ -324,7 +326,7 @@ function drawPart(layer, doc, part, view) {
       node('rect', { x: -8, y: -14, width: 16, height: 28, rx: 2, class: boxClass }, g);
     }
     const t = node('text', { x: 15, y: -4, class: 'label' }, g);
-    t.textContent = part.id;
+    t.textContent = part.props.label || part.id;
     if (view.sim) {
       const val = node('text', { x: 15, y: 9, class: 'value' }, g);
       val.textContent = fmtI(view.sim.amps.get(part.id) || 0);
@@ -343,7 +345,7 @@ function drawPart(layer, doc, part, view) {
       node('line', { x1: 16, y1: -6, x2: 22, y2: -12, class: symClass }, g);
     }
     const t = node('text', { x: 24, y: -4, class: 'label' }, g);
-    t.textContent = part.id;
+    t.textContent = part.props.label || part.id;
     if (view.sim) {
       const val = node('text', { x: 24, y: 9, class: 'value' }, g);
       val.textContent = fmtI(view.sim.amps.get(part.id) || 0);

@@ -25,8 +25,9 @@ export class Sim {
     this.samples = new Map();
     this.windowSize = 1;
     for (const p of this.doc.parts) {
-      const closed = !!p.props.closed;
-      this.dev.set(p.id, { on: closed, closed, timer: 0, fault: 0, failed: false });
+      // a driven NC contact rests closed, a driven NO rests open
+      const resting = p.props.owner ? !!p.props.nc : !!p.props.closed;
+      this.dev.set(p.id, { on: resting, closed: resting, closeT: 0, want: resting, held: resting, holdT: 0, fault: 0, failed: false });
     }
   }
 
@@ -41,12 +42,6 @@ export class Sim {
   isClosed(part) {
     const d = this.dev.get(part.id);
     if (!d || d.failed) return false;
-    const owner = part.props.owner;
-    if (owner) {
-      const o = this.dev.get(owner);
-      if (!o) return false;
-      return part.props.nc ? !o.on : o.on;
-    }
     return d.closed;
   }
 
@@ -216,29 +211,52 @@ export class Sim {
           : vNow;
         const pickup = Number(p.props.pickup) || 0;
         const release = Number(p.props.release) || 0;
-        const ton = Number(p.props.ton) || 0;
-        const toff = Number(p.props.toff) || 0;
         if (!d.failed) {
-          if (!d.on) {
-            if (v >= pickup) {
-              d.timer += dt;
-              if (d.timer >= ton) {
-                d.on = true;
-                d.timer = 0;
-              }
-            } else {
-              d.timer = 0;
-            }
-          } else if (v <= release) {
-            d.timer += dt;
-            if (d.timer >= toff) {
-              d.on = false;
-              d.timer = 0;
-            }
-          } else {
-            d.timer = 0;
+          if (!d.on && v >= pickup) d.on = true;
+          else if (d.on && v <= release) d.on = false;
+        }
+        // off-delay: the contacts stay in the energised position for `toff` after
+        // the coil drops. This is a timer relay holding its output, not a contact
+        // that opens slowly.
+        const holdFor = Math.max(0, Number(p.props.toff) || 0);
+        if (d.on) {
+          d.held = true;
+          d.holdT = 0;
+        } else if (d.held) {
+          d.holdT += dt;
+          if (d.holdT >= holdFor) {
+            d.held = false;
+            d.holdT = 0;
           }
         }
+      }
+
+      // Contact timing follows the contact direction, not the coil direction:
+      // closing always needs time, opening is immediate.
+      if (p.kind === 'switch' && p.props.owner) {
+        const ownerPart = this.doc.parts.find(x => x.id === p.props.owner);
+        const owner = ownerPart ? this.dev.get(ownerPart.id) : null;
+        const desired = owner ? (owner.held ? !p.props.nc : !!p.props.nc) : false;
+        // tOperate on the relay is how long its contact needs to close
+        const closeDelay = Math.max(0, Number((ownerPart && ownerPart.props.ton) || 0));
+        if (!desired && d.closed) {
+          // opening never waits
+          d.closed = false;
+          d.closeT = 0;
+        } else if (desired && !d.closed) {
+          // a contact needs at least one full step before it can start closing,
+          // so a coil that loses supply inside the same step cannot seal itself in
+          if (d.want) {
+            d.closeT += dt;
+            if (d.closeT >= closeDelay) {
+              d.closed = true;
+              d.closeT = 0;
+            }
+          }
+        } else {
+          d.closeT = 0;
+        }
+        d.want = desired;
       }
     }
 

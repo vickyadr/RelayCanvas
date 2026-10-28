@@ -34,9 +34,10 @@ let acc = 0;
 let lastPaint = 0;
 
 const editor = new Editor(svg, doc, {
-  onChange: () => {
+  onChange: (opts) => {
     persist();
-    renderPanel(panelEl, doc, editor);
+    // rebuilding the panel while the user is typing would drop the focus
+    if (!opts || !opts.keepFocus) renderPanel(panelEl, doc, editor);
     if (sim) sim.reset();
   },
   onSelect: () => renderPanel(panelEl, doc, editor),
