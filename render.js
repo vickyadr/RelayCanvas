@@ -54,11 +54,22 @@ export function endPoint(doc, end, depth = 0) {
 export function wirePolyline(doc, w, depth = 0) {
   const a = endPoint(doc, w.a, depth);
   const b = endPoint(doc, w.b, depth);
-  if (Math.abs(a.x - b.x) < 1 || Math.abs(a.y - b.y) < 1) return [a, b];
-  const firstVertical = leavesVertically(doc, w.a);
-  return firstVertical
-    ? [a, { x: a.x, y: b.y }, b]
-    : [a, { x: b.x, y: a.y }, b];
+  const dx = b.x - a.x;
+  const dy = b.y - a.y;
+  if (Math.abs(dx) < 1 || Math.abs(dy) < 1) return [a, b];
+
+  // a wire tapped onto another wire must leave perpendicular to it
+  if (!leavesVertically(doc, w.a)) return [a, { x: b.x, y: a.y }, b];
+
+  // pins sit on vertical parts, so both ends are entered vertically and the
+  // horizontal jog goes in the middle. One elbow would leave a short stub at a
+  // pin, which is what looked like piled wires after a small drag.
+  if (Math.abs(dy) >= 40) {
+    const base = Math.round((a.y + b.y) / 2 / 10) * 10;
+    const mid = avoidRails(doc, base, Math.min(a.y, b.y) + 12, Math.max(a.y, b.y) - 12);
+    return [a, { x: a.x, y: mid }, { x: b.x, y: mid }, b];
+  }
+  return [a, { x: a.x, y: b.y }, b];
 }
 
 /** A wire that taps another wire must leave perpendicular to it, so it cannot run
@@ -124,6 +135,9 @@ export function render(svg, doc, view) {
   svg.textContent = '';
   node('rect', { x: 0, y: 0, width: CANVAS_W, height: CANVAS_H, class: 'bg' }, svg);
 
+  // rails sit under the wires, so a hop drawn over a rail stays visible instead
+  // of being cut in half by the rail line
+  const railLayer = node('g', {}, svg);
   const wireLayer = node('g', {}, svg);
   const partLayer = node('g', {}, svg);
 
@@ -156,11 +170,6 @@ export function render(svg, doc, view) {
       const ib = Math.abs(v.sim.amps.get(w.b.part) || 0);
       if (ia > 1e-6 || ib > 1e-6) path.classList.add('live');
     }
-    for (const end of [w.a, w.b]) {
-      if (end.pin !== 'wire') continue;
-      const pt = endPoint(doc, end);
-      node('circle', { cx: pt.x, cy: pt.y, r: 3, class: 'dot' }, wireLayer);
-    }
     if (selected) {
       for (const [end, pt] of [['a', a], ['b', b]]) {
         node('circle', {
@@ -176,7 +185,25 @@ export function render(svg, doc, view) {
     }
   }
 
-  for (const p of doc.parts) drawPart(partLayer, doc, p, v);
+  // one dot per real connection: every rail tap or wire tap, plus any pin that
+  // two or more wires share. A single wire on a pin is just a wire end.
+  const joints = new Map();
+  for (const w of doc.wires) {
+    for (const end of [w.a, w.b]) {
+      const pt = endPoint(doc, end);
+      const key = Math.round(pt.x) + ',' + Math.round(pt.y);
+      const rec = joints.get(key) || { x: pt.x, y: pt.y, count: 0, tap: false };
+      rec.count += 1;
+      if (end.pin === 'tap' || end.pin === 'wire') rec.tap = true;
+      joints.set(key, rec);
+    }
+  }
+  for (const rec of joints.values()) {
+    if (!rec.tap && rec.count < 2) continue;
+    node('circle', { cx: rec.x, cy: rec.y, r: 3, class: 'dot' }, wireLayer);
+  }
+
+  for (const p of doc.parts) drawPart(p.kind === 'rail' ? railLayer : partLayer, doc, p, v);
 
   const overlay = node('g', {}, svg);
   for (const id of v.selection || []) {
@@ -221,7 +248,9 @@ function hoppedPath(wireId, pts, segs) {
       const xhi = Math.max(s.p.x, s.q.x);
       if (p.x < xlo || p.x > xhi) continue;
       const y = s.p.y;
-      if (y <= lo + 10 || y >= hi - 10) continue;
+      // a hop needs room for the 7 px arc; 8 px is the smallest margin that keeps
+      // crossings next to a bend visible
+      if (y <= lo + 8 || y >= hi - 8) continue;
       // a horizontal run that starts or ends exactly here is joined, not crossed
       const joined = Math.hypot(s.p.x - p.x, s.p.y - y) < 3 || Math.hypot(s.q.x - p.x, s.q.y - y) < 3;
       if (!joined) hits.push(y);
@@ -234,6 +263,25 @@ function hoppedPath(wireId, pts, segs) {
     d += ' L ' + q.x + ' ' + q.y;
   }
   return d;
+}
+
+// A jog that lands on a rail axis makes the wire disappear into the rail, which
+// reads as if the wire joined that rail. Nudge the jog off any rail line.
+function avoidRails(doc, mid, lo, hi) {
+  const rails = [];
+  for (const part of doc.parts) {
+    if (part.kind !== 'rail') continue;
+    const [a, b] = railEnds(part);
+    if (Math.abs(a.y - b.y) < 1) rails.push(a.y);
+  }
+  if (!rails.length) return mid;
+  const hits = (y) => rails.some(r => Math.abs(r - y) < 8);
+  if (!hits(mid)) return mid;
+  for (const delta of [10, -10, 20, -20, 30, -30, 40, -40]) {
+    const y = mid + delta;
+    if (y > lo && y < hi && !hits(y)) return y;
+  }
+  return mid;
 }
 
 function pinDots(g, part) {
@@ -299,7 +347,8 @@ function drawPart(layer, doc, part, view) {
   }
 
   if (part.kind === 'coil') {
-    const on = view.sim ? view.sim.dev.get(part.id).on : false;
+    const dev = view.sim ? view.sim.dev.get(part.id) : null;
+    const on = dev ? dev.on : false;
     const box = node('rect', { x: -23, y: -16, width: 46, height: 32, rx: 4, class: boxClass }, g);
     if (Number(part.props.ton) > 0) box.setAttribute('stroke-dasharray', '4 3');
     node('path', { d: 'M -13 8 q 6.5 -16 13 0 q 6.5 -16 13 0', class: symClass }, g);

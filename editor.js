@@ -109,8 +109,10 @@ export class Editor {
   }
 
   changed(opts) {
-    this.render();
+    // notify first: the host may reset the simulation, and rendering with a stale
+    // device list is what produced the "reading 'on'" crash
     if (this.hooks.onChange) this.hooks.onChange(opts);
+    this.render();
   }
 
   render() {

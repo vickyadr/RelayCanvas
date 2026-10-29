@@ -1,6 +1,7 @@
 // App wiring: palette, toolbar, simulation loop, and persistence.
 
 import { KINDS, newDoc, sanitizeDoc } from './model.js';
+import { demoDoc } from './demo.js';
 import { Editor } from './editor.js';
 import { renderPanel } from './panel.js';
 import { Sim } from './sim.js';
@@ -170,65 +171,6 @@ function load() {
   } catch (err) {
     return null;
   }
-}
-
-function demoDoc() {
-  const d = newDoc();
-  const rail = (id, y, v, ac = false) => ({ id, kind: 'rail', x: 600, y, rot: 0, props: { v, ac, f: 50, rsrc: 0.1, len: 1000 } });
-  const coil = (id, x, y, ton) => ({ id, kind: 'coil', x, y, rot: 0, props: { r: 2400, pickup: 18, release: 6, ton, toff: 0, rating: 0 } });
-  const sw = (id, x, y, extra) => ({ id, kind: 'switch', x, y, rot: 0, props: { closed: false, owner: '', nc: false, ...extra } });
-  const out = (id, x, y, label) => ({ id, kind: 'out', x, y, rot: 0, props: { r: 2400, label } });
-
-  d.parts.push(
-    rail('R1', 80, 24), rail('R2', 200, 220, true), rail('R3', 320, 0), rail('R4', 440, 0),
-    sw('S1', 200, 140), coil('K1', 200, 380, 0.01),
-    sw('S2', 320, 140), coil('K2', 320, 380, 0.01),
-    sw('S3', 470, 250, { owner: 'K1' }),
-    sw('S4', 560, 180, { owner: 'K2' }),
-    sw('S5', 560, 300, { owner: 'K3', nc: true, closed: true }),
-    coil('K3', 515, 380, 0.01),
-    sw('S6', 700, 140, { owner: 'K2' }),
-    sw('S7', 700, 260, { owner: 'K3', nc: true, closed: true }),
-    out('O1', 700, 380, 'DOWN'),
-    sw('S8', 860, 140, { owner: 'K1' }),
-    out('O2', 860, 380, 'UP'),
-    { id: 'J1', kind: 'passive', x: 1000, y: 380, rot: 0, props: { r: 0, c: 0, rating: 0 } }
-  );
-
-  // taps are stored as an offset from the rail centre, so they survive moving the rail
-  const tap = (part, x) => ({ part, pin: 'tap', t: x - 600 });
-  const pin = (part, i) => ({ part, pin: i });
-  const wires = (a, b) => ({ id: 'W' + (d.wires.length + 1), a, b });
-
-  d.wires.push(
-    wires(tap('R1', 200, 80), pin('S1', 0)),
-    wires(pin('S1', 1), pin('K1', 0)),
-    wires(pin('K1', 1), tap('R4', 200, 440)),
-
-    wires(tap('R1', 320, 80), pin('S2', 0)),
-    wires(pin('S2', 1), pin('K2', 0)),
-    wires(pin('K2', 1), tap('R4', 320, 440)),
-
-    wires(tap('R1', 470, 80), pin('S3', 0)),
-    wires(pin('S3', 1), pin('K3', 0)),
-    wires(tap('R1', 560, 80), pin('S4', 0)),
-    wires(pin('S4', 1), pin('S5', 0)),
-    wires(pin('S5', 1), pin('K3', 0)),
-    wires(pin('K3', 1), tap('R4', 515, 440)),
-
-    wires(tap('R1', 700, 80), pin('S6', 0)),
-    wires(pin('S6', 1), pin('S7', 0)),
-    wires(pin('S7', 1), pin('O1', 0)),
-    wires(pin('O1', 1), tap('R4', 700, 440)),
-
-    wires(tap('R1', 860, 80), pin('S8', 0)),
-    wires(pin('S8', 1), pin('O2', 0)),
-    wires(pin('O2', 1), tap('R4', 860, 440)),
-
-    wires(tap('R3', 1000, 320), pin('J1', 0)),
-    wires(pin('J1', 1), tap('R4', 1000, 440))
-  );
-  return d;
 }
 
 function starter() {

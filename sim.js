@@ -236,14 +236,17 @@ export class Sim {
       if (p.kind === 'switch' && p.props.owner) {
         const ownerPart = this.doc.parts.find(x => x.id === p.props.owner);
         const owner = ownerPart ? this.dev.get(ownerPart.id) : null;
-        const desired = owner ? (owner.held ? !p.props.nc : !!p.props.nc) : false;
+        // closing follows the coil right now; holding follows the off-delay window,
+        // so a pending on-delay must reset as soon as the coil drops
+        const wantClosed = owner ? (owner.on ? !p.props.nc : !!p.props.nc) : false;
+        const keepClosed = owner ? (owner.held ? !p.props.nc : !!p.props.nc) : false;
         // tOperate on the relay is how long its contact needs to close
         const closeDelay = Math.max(0, Number((ownerPart && ownerPart.props.ton) || 0));
-        if (!desired && d.closed) {
+        if (d.closed && !keepClosed) {
           // opening never waits
           d.closed = false;
           d.closeT = 0;
-        } else if (desired && !d.closed) {
+        } else if (!d.closed && wantClosed) {
           // a contact needs at least one full step before it can start closing,
           // so a coil that loses supply inside the same step cannot seal itself in
           if (d.want) {
@@ -253,10 +256,10 @@ export class Sim {
               d.closeT = 0;
             }
           }
-        } else {
+        } else if (!d.closed) {
           d.closeT = 0;
         }
-        d.want = desired;
+        d.want = wantClosed;
       }
     }
 

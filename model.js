@@ -169,12 +169,18 @@ export function sanitizeDoc(raw) {
     return { part: e.part, pin: Number(e.pin) };
   };
   const wires = [];
+  const usedWireIds = new Set();
   for (const w of Array.isArray(raw.wires) ? raw.wires : []) {
     if (!w) continue;
     const a = fixEnd(w.a);
     const b = fixEnd(w.b);
     if (!a || !b) continue;
-    wires.push({ id: String(w.id || 'W' + wires.length), a, b });
+    // duplicate ids break hop detection and wire taps, so make every id unique
+    let id = String(w.id || 'W' + wires.length);
+    let n = 2;
+    while (usedWireIds.has(id)) id = String(w.id || 'W') + '-' + n++;
+    usedWireIds.add(id);
+    wires.push({ id, a, b });
   }
   // drop wires that tap a wire which did not survive validation
   for (let pass = 0; pass < 8; pass++) {

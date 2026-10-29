@@ -48,12 +48,20 @@ export function renderPanel(root, doc, editor) {
     return;
   }
 
-  for (const f of fieldDefs(part, doc)) {
+  for (const f of fieldDefs(part, doc, editor)) {
     const row = document.createElement('div');
     row.className = 'row';
     const label = document.createElement('span');
     label.textContent = f.label;
     row.append(label);
+
+    if (f.type === 'state') {
+      const state = document.createElement('span');
+      state.textContent = typeof f.value === 'function' ? f.value() : f.value;
+      row.append(state);
+      root.append(row);
+      continue;
+    }
 
     let input;
     if (f.type === 'select') {
@@ -97,7 +105,7 @@ export function renderPanel(root, doc, editor) {
   }
 }
 
-function fieldDefs(part, doc) {
+function fieldDefs(part, doc, editor) {
   const p = part.props;
   const common = [
     { label: 'x', type: 'number', value: part.x, apply: v => { part.x = Math.round(Number(v)); } },
@@ -110,6 +118,8 @@ function fieldDefs(part, doc) {
     return [
       ...common,
       { label: 'V', type: 'number', value: p.v, apply: v => { p.v = Number(v); } },
+      { label: 'AC', type: 'check', value: p.ac, apply: v => { p.ac = !!v; } },
+      { label: 'f Hz', type: 'number', value: p.f || 50, apply: v => { p.f = Math.max(1, Number(v)); } },
       { label: 'panjang', type: 'number', value: p.len || 320, apply: v => { p.len = Math.max(80, Math.round(Number(v))); } },
       { label: 'Rsrc', type: 'number', value: p.rsrc, apply: v => { p.rsrc = Math.max(0.001, Number(v)); } }
     ];
@@ -127,9 +137,14 @@ function fieldDefs(part, doc) {
     const coils = doc.parts.filter(x => x.kind === 'coil').map(c => ({ value: c.id, label: c.props.label || c.id }));
     return [
       ...common,
-      { label: 'closed', type: 'check', value: p.closed, apply: v => { p.closed = !!v; } },
+      // the contact state is owned by the simulation; clicking the symbol toggles it
+      { label: 'kontak', type: 'state', value: () => {
+        const closed = editor && editor.sim ? editor.sim.isClosed(part) : !!p.closed;
+        return closed ? 'tertutup' : 'terbuka';
+      } },
       { label: 'owner', type: 'select', value: p.owner || '', options: [{ value: '', label: '-' }, ...coils], apply: v => { p.owner = String(v); } },
-      { label: 'NC', type: 'check', value: p.nc, apply: v => { p.nc = !!v; if (v) p.closed = true; } }
+      // checked = NC, unchecked = NO
+      { label: 'NC', type: 'check', value: p.nc, apply: v => { p.nc = !!v; p.closed = !!v; } }
     ];
   }
 
