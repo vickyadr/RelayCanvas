@@ -19,6 +19,7 @@ export class Sim {
     this.t = 0;
     this.dev = new Map();
     this.capV = new Map();
+    this.indI = new Map();
     this.volts = new Map();
     this.amps = new Map();
     this.flags = { short: false, singular: false, maxI: 0 };
@@ -98,6 +99,10 @@ export class Sim {
         els.push({ type: 'c', id: p.id, a, b, c: Number(p.props.c) * 1e-6 });
         continue;
       }
+      if (p.kind === 'passive' && Number(p.props.l) > 0) {
+        els.push({ type: 'l', id: p.id, a, b, l: Number(p.props.l) });
+        continue;
+      }
       els.push({
         type: 'r',
         id: p.id,
@@ -132,6 +137,17 @@ export class Sim {
         A[j][i] -= e.g;
         z[i] += e.g * e.vprev;
         z[j] -= e.g * e.vprev;
+      } else if (e.type === 'l') {
+        e.g = dt / Math.max(1e-9, e.l);
+        e.iprev = this.indI.get(e.id) || 0;
+        const i = idx.get(e.a);
+        const j = idx.get(e.b);
+        A[i][i] += e.g;
+        A[j][j] += e.g;
+        A[i][j] -= e.g;
+        A[j][i] -= e.g;
+        z[i] -= e.iprev;
+        z[j] += e.iprev;
       } else if (e.type === 'src') {
         const g = 1 / e.r;
         const i = idx.get(e.n);
@@ -178,6 +194,7 @@ export class Sim {
       let i = 0;
       if (e.type === 'r') i = v / e.r;
       else if (e.type === 'c') i = e.g * v - e.g * e.vprev;
+      else if (e.type === 'l') { i = e.iprev + e.g * v; this.indI.set(e.id, i); }
       this.amps.set(e.id, i);
       maxI = Math.max(maxI, Math.abs(i));
     }

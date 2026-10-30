@@ -65,8 +65,11 @@ export function wirePolyline(doc, w, depth = 0) {
   // horizontal jog goes in the middle. One elbow would leave a short stub at a
   // pin, which is what looked like piled wires after a small drag.
   if (Math.abs(dy) >= 40) {
+    const min = Math.min(a.y, b.y) + 12;
+    const max = Math.max(a.y, b.y) - 12;
     const base = Math.round((a.y + b.y) / 2 / 10) * 10;
-    const mid = avoidRails(doc, base, Math.min(a.y, b.y) + 12, Math.max(a.y, b.y) - 12);
+    const desired = Number.isFinite(Number(w.jog)) ? Math.round(Number(w.jog)) : base;
+    const mid = avoidRails(doc, desired, min, max);
     return [a, { x: a.x, y: mid }, { x: b.x, y: mid }, b];
   }
   return [a, { x: a.x, y: b.y }, b];
@@ -133,6 +136,17 @@ export function routePath(a, b) {
 export function render(svg, doc, view) {
   const v = view || {};
   svg.textContent = '';
+  const stage = svg.parentElement;
+  const zoom = Number(v.zoom) || 1;
+  const margin = 120;
+  const visible = stage ? {
+    x: stage.scrollLeft / zoom - margin,
+    y: stage.scrollTop / zoom - margin,
+    w: stage.clientWidth / zoom + margin * 2,
+    h: stage.clientHeight / zoom + margin * 2
+  } : { x: -margin, y: -margin, w: CANVAS_W + margin * 2, h: CANVAS_H + margin * 2 };
+  const inView = (box) => box.x < visible.x + visible.w && box.x + box.w > visible.x &&
+    box.y < visible.y + visible.h && box.y + box.h > visible.y;
   node('rect', { x: 0, y: 0, width: CANVAS_W, height: CANVAS_H, class: 'bg' }, svg);
 
   // rails sit under the wires, so a hop drawn over a rail stays visible instead
@@ -142,21 +156,33 @@ export function render(svg, doc, view) {
   const partLayer = node('g', {}, svg);
 
   // one pass of segment collection so every wire can hop over horizontal runs
+  const wirePts = new Map(doc.wires.map(w => [w.id, wirePoints(doc, w)]));
+  const visibleWires = doc.wires.filter(w => {
+    const pts = wirePts.get(w.id);
+    if (!pts || !pts.length) return true;
+    let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+    for (const p of pts) {
+      minX = Math.min(minX, p.x); minY = Math.min(minY, p.y);
+      maxX = Math.max(maxX, p.x); maxY = Math.max(maxY, p.y);
+    }
+    return inView({ x: minX, y: minY, w: maxX - minX, h: maxY - minY });
+  });
   const hSegs = [];
-  for (const w of doc.wires) {
-    const pts = wirePoints(doc, w);
+  for (const w of visibleWires) {
+    const pts = wirePts.get(w.id);
     for (let i = 0; i < pts.length - 1; i++) {
       hSegs.push({ wire: w.id, p: pts[i], q: pts[i + 1] });
     }
   }
   for (const part of doc.parts) {
     if (part.kind !== 'rail') continue;
+    if (!inView(partBox(part))) continue;
     const [a, b] = railEnds(part);
     hSegs.push({ wire: null, p: a, q: b });
   }
 
-  for (const w of doc.wires) {
-    const pts = wirePoints(doc, w);
+  for (const w of visibleWires) {
+    const pts = wirePts.get(w.id);
     const a = pts[0];
     const b = pts[pts.length - 1];
     const selected = v.selectedWire === w.id;
@@ -202,6 +228,18 @@ export function render(svg, doc, view) {
           'data-end': end
         }, wireLayer);
       }
+      // draggable horizontal jog for Z-shaped wires
+      const pts = wirePoints(doc, w);
+      if (pts.length >= 3 && Math.abs(pts[0].y - pts[pts.length-1].y) >= 40) {
+        node('circle', {
+          cx: (pts[1].x + pts[2].x) / 2,
+          cy: pts[1].y,
+          r: 6,
+          class: 'handle',
+          'data-wire-jog': '1',
+          'data-wire': w.id
+        }, wireLayer);
+      }
     }
   }
 
@@ -223,12 +261,13 @@ export function render(svg, doc, view) {
     node('circle', { cx: rec.x, cy: rec.y, r: 3, class: 'dot' }, wireLayer);
   }
 
-  for (const p of doc.parts) drawPart(p.kind === 'rail' ? railLayer : partLayer, doc, p, v);
+  const visibleParts = doc.parts.filter(p => inView(partBox(p)));
+  for (const p of visibleParts) drawPart(p.kind === 'rail' ? railLayer : partLayer, doc, p, v);
 
   const overlay = node('g', {}, svg);
   for (const id of v.selection || []) {
     const part = doc.parts.find(p => p.id === id);
-    if (!part) continue;
+    if (!part || !inView(partBox(part))) continue;
     const box = partBox(part);
     node('rect', { x: box.x, y: box.y, width: box.w, height: box.h, class: 'sel' }, overlay);
     if (part.kind === 'rail') {
@@ -415,6 +454,8 @@ function drawPart(layer, doc, part, view) {
     if (cap) {
       node('line', { x1: -11, y1: -4, x2: 11, y2: -4, class: symClass }, g);
       node('line', { x1: -11, y1: 4, x2: 11, y2: 4, class: symClass }, g);
+    } else if (Number(part.props.l) > 0) {
+      node('path', { d: 'M 0 -14 Q 8 -7 0 0 Q 8 7 0 14', class: symClass }, g);
     } else {
       node('rect', { x: -8, y: -14, width: 16, height: 28, rx: 2, class: boxClass }, g);
     }

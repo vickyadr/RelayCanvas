@@ -52,6 +52,7 @@ export class Editor {
     this.pan = null;
     this.wireStart = null;
     this.wireDrag = null;
+    this.jogDrag = null;
     this.drag = null;
     this.railResize = null;
     this.sim = null;
@@ -72,6 +73,13 @@ export class Editor {
       this.zoom = Math.max(0.5, Math.min(4, this.zoom * factor));
       this.render();
     }, { passive: false });
+    // re-render on scroll so off-screen parts are culled
+    let scrollPending = false;
+    stage.addEventListener('scroll', () => {
+      if (scrollPending) return;
+      scrollPending = true;
+      requestAnimationFrame(() => { scrollPending = false; this.render(); });
+    }, { passive: true });
     svg.addEventListener('pointerdown', (e) => this.onDown(e));
     svg.addEventListener('pointermove', (e) => this.onMove(e));
     svg.addEventListener('pointerup', (ev) => this.onUp(ev));
@@ -122,7 +130,7 @@ export class Editor {
       .map(p => ({ ...p, props: { ...p.props } }));
     const wires = this.doc.wires
       .filter(w => ids.has(w.a.part) && ids.has(w.b.part) && w.a.pin !== 'wire' && w.b.pin !== 'wire')
-      .map(w => ({ a: { ...w.a }, b: { ...w.b } }));
+      .map(w => ({ a: { ...w.a }, b: { ...w.b }, ...(Number.isFinite(Number(w.jog)) ? { jog: w.jog } : {}) }));
     this.clipboard = { parts, wires };
   }
 
@@ -152,7 +160,9 @@ export class Editor {
         const na = { ...cw.a, part: idMap.get(cw.a.part) };
         const nb = { ...cw.b, part: idMap.get(cw.b.part) };
         if (!na.part || !nb.part) continue;
-        doc.wires.push({ id: 'W' + doc.wires.length, a: na, b: nb });
+        const wire = { id: 'W' + doc.wires.length, a: na, b: nb };
+        if (Number.isFinite(Number(cw.jog))) wire.jog = cw.jog;
+        doc.wires.push(wire);
       }
       this.selection = new Set(idMap.values());
     });
@@ -187,7 +197,8 @@ export class Editor {
       selection: [...this.selection],
       selectedWire: this.selectedWire,
       marquee: this.marquee,
-      ghost: this.ghost
+      ghost: this.ghost,
+      zoom: this.zoom
     });
   }
 
@@ -337,6 +348,14 @@ export class Editor {
       this.wireDrag = { wireId: handleEl.dataset.wire, end: handleEl.dataset.end };
       return;
     }
+    const jogEl = e.target.closest('[data-wire-jog]');
+    if (jogEl && this.tool === 'select') {
+      const wire = this.doc.wires.find(w => w.id === jogEl.dataset.wire);
+      if (wire) {
+        this.jogDrag = { wireId: wire.id, moved: false };
+        return;
+      }
+    }
     const railResizeEl = e.target.closest('[data-rail-resize]');
     if (railResizeEl && this.tool === 'select') {
       const part = partById(this.doc, railResizeEl.dataset.part);
@@ -466,6 +485,18 @@ export class Editor {
       this.render();
       return;
     }
+    if (this.jogDrag) {
+      if (!this.jogDrag.moved) {
+        this.snapshot();
+        this.jogDrag.moved = true;
+      }
+      const wire = this.doc.wires.find(w => w.id === this.jogDrag.wireId);
+      if (wire) {
+        wire.jog = snap(this.point(e).y);
+      }
+      this.render();
+      return;
+    }
     if (this.marquee) {
       const pt = this.point(e);
       this.marquee.x1 = pt.x;
@@ -489,6 +520,12 @@ export class Editor {
     if (this.railResize) {
       const moved = this.railResize.moved;
       this.railResize = null;
+      if (moved) this.changed();
+      return;
+    }
+    if (this.jogDrag) {
+      const moved = this.jogDrag.moved;
+      this.jogDrag = null;
       if (moved) this.changed();
       return;
     }

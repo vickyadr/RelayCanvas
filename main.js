@@ -10,6 +10,16 @@ import { fmtI } from './render.js';
 const KEY = 'relaycanvas.doc';
 const DT = 0.001;
 
+const menuToggle = document.getElementById('menuToggle');
+const headerMenu = document.getElementById('headerMenu');
+if (menuToggle && headerMenu) {
+  menuToggle.addEventListener('click', () => {
+    const open = headerMenu.classList.toggle('open');
+    menuToggle.setAttribute('aria-expanded', open ? 'true' : 'false');
+    menuToggle.textContent = open ? '✕' : '☰';
+  });
+}
+
 const svg = document.getElementById('canvas');
 const palette = document.getElementById('palette');
 const panelEl = document.getElementById('panel');
@@ -22,6 +32,7 @@ const PALETTE = [
   { kind: 'coil', label: 'Relay' },
   { kind: 'passive', label: 'Resistor' },
   { kind: 'passive', label: 'Kapasitor', props: { r: 0, c: 1000 } },
+  { kind: 'passive', label: 'Induktor', props: { r: 0, c: 0, l: 0.1 } },
   { kind: 'passive', label: 'Jumper', props: { r: 0, c: 0 } },
   { kind: 'led', label: 'LED' },
   { kind: 'out', label: 'Output' }
@@ -57,9 +68,63 @@ function markTools() {
 }
 
 function buildPalette() {
+  const isDesktop = window.matchMedia('(min-width: 768px)').matches;
+  const minimized = isDesktop && (typeof localStorage !== 'undefined') && localStorage.getItem('relaycanvas.palette.minimized') === '1';
+  palette.classList.toggle('minimized', minimized);
+
+  // rebuild when crossing the mobile/desktop breakpoint so minimize state re-evaluates
+  if (!buildPalette._resizeBound) {
+    buildPalette._resizeBound = true;
+    let lastDesktop = isDesktop;
+    window.addEventListener('resize', () => {
+      const now = window.matchMedia('(min-width: 768px)').matches;
+      if (now !== lastDesktop) {
+        lastDesktop = now;
+        palette.textContent = '';
+        buildPalette();
+      }
+    });
+  }
+
+  const header = document.createElement('div');
+  header.className = 'palette-header';
+  header.style.display = 'flex';
+  header.style.alignItems = 'center';
+  header.style.justifyContent = 'space-between';
+  header.style.gap = '8px';
+  header.style.marginBottom = minimized ? '0' : '8px';
+
   const h = document.createElement('h2');
   h.textContent = 'Komponen';
-  palette.append(h);
+  h.style.margin = '0';
+  header.append(h);
+
+  const toggle = document.createElement('button');
+  toggle.type = 'button';
+  toggle.className = 'palette-toggle';
+  const setIcon = () => {
+    const desktop = window.matchMedia('(min-width: 768px)').matches;
+    toggle.textContent = desktop ? (minimized ? '›' : '‹') : (minimized ? '▸' : '▾');
+  };
+  setIcon();
+  window.addEventListener('resize', setIcon);
+  toggle.title = minimized ? 'Perluas komponen' : 'Minimalkan komponen';
+  toggle.style.padding = '2px 10px';
+  toggle.style.minHeight = '24px';
+  toggle.style.fontSize = '16px';
+  toggle.style.fontWeight = '700';
+  toggle.style.borderRadius = '6px';
+  toggle.addEventListener('click', () => {
+    const next = localStorage.getItem('relaycanvas.palette.minimized') === '1' ? '0' : '1';
+    localStorage.setItem('relaycanvas.palette.minimized', next);
+    palette.textContent = '';
+    buildPalette();
+  });
+  header.append(toggle);
+  palette.append(header);
+
+  if (minimized) return;
+
   for (const item of PALETTE) {
     const b = document.createElement('button');
     b.textContent = item.label;

@@ -2,14 +2,23 @@
 <html lang="id">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>RelayCanvas</title>
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<meta name="theme-color" content="#050607">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<title>RelayCanvas — Dark Mobile</title>
 <link rel="icon" href="data:,">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans:wght@400;500;600;700&display=swap">
 <link rel="stylesheet" href="./style.css">
 </head>
 <body>
 <header>
+  <button id="menuToggle" class="menu-toggle" type="button" aria-label="Menu" aria-expanded="false">☰</button>
   <h1>RelayCanvas</h1>
+  <span id="status" class="status">siap</span>
+  <div id="headerMenu" class="header-menu">
   <div class="group">
     <button data-tool="select" class="on" title="Pilih dan geser (V)">Pilih</button>
     <button data-tool="wire" title="Tarik kabel (W)">Kabel</button>
@@ -27,7 +36,7 @@
     <button id="help" title="Pintasan dan cara pakai">Bantuan</button>
     <input id="file" type="file" accept=".rly,.json" hidden>
   </div>
-  <span id="status" class="status">siap</span>
+  </div>
 </header>
 
 <main>
@@ -38,7 +47,7 @@
   <aside id="panel" aria-label="Properti"></aside>
 </main>
 
-<p class="hint">Klik komponen di kiri lalu klik kanvas. Kabel: tombol Kabel, klik pin lalu pin lain. R untuk rotasi, Del hapus, Esc batal. Klik tengah lalu tarik untuk geser kanvas.</p>
+<p class="hint">Klik komponen di kiri lalu klik kanvas. Kabel: tombol Kabel, klik pin lalu pin lain. R rotasi, Del hapus, Esc batal. Klik tengah lalu tarik untuk geser kanvas.</p>
 
 <dialog id="helpdlg">
   <h3>Pintasan dan cara pakai</h3>

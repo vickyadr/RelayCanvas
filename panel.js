@@ -6,12 +6,48 @@ import { pruneWires } from './editor.js';
 
 export function renderPanel(root, doc, editor) {
   root.textContent = '';
+  const minimized = (typeof localStorage !== 'undefined') && localStorage.getItem('relaycanvas.panel.minimized') === '1';
+  root.classList.toggle('minimized', minimized);
   const part = editor.selectedId ? partById(doc, editor.selectedId) : null;
+  const count = editor.selection ? editor.selection.size : 0;
+
+  const header = document.createElement('div');
+  header.className = 'panel-header';
+  header.style.display = 'flex';
+  header.style.alignItems = 'center';
+  header.style.justifyContent = 'space-between';
+  header.style.gap = '8px';
+  header.style.marginBottom = minimized ? '0' : '4px';
 
   const title = document.createElement('h2');
-  const count = editor.selection ? editor.selection.size : 0;
+  title.style.margin = '0';
   title.textContent = count > 1 ? count + ' komponen' : part ? part.kind + ' ' + part.id : 'Properti';
-  root.append(title);
+  header.append(title);
+
+  const toggle = document.createElement('button');
+  toggle.type = 'button';
+  toggle.className = 'panel-toggle';
+  const setIcon = () => {
+    const desktop = window.matchMedia('(min-width: 768px)').matches;
+    toggle.textContent = desktop ? (minimized ? '‹' : '›') : (minimized ? '▸' : '▾');
+  };
+  setIcon();
+  window.addEventListener('resize', setIcon);
+  toggle.title = minimized ? 'Perluas panel properti' : 'Minimalkan panel properti';
+  toggle.style.padding = '2px 10px';
+  toggle.style.minHeight = '24px';
+  toggle.style.fontSize = '16px';
+  toggle.style.fontWeight = '700';
+  toggle.style.borderRadius = '6px';
+  toggle.addEventListener('click', () => {
+    const next = localStorage.getItem('relaycanvas.panel.minimized') === '1' ? '0' : '1';
+    localStorage.setItem('relaycanvas.panel.minimized', next);
+    renderPanel(root, doc, editor);
+  });
+  header.append(toggle);
+  root.append(header);
+
+  if (minimized) return;
 
   if (count > 1) {
     const p = document.createElement('p');
@@ -154,6 +190,7 @@ function fieldDefs(part, doc, editor) {
       ...common,
       { label: 'R', type: 'number', value: p.r, apply: v => { p.r = Math.max(0, Number(v)); } },
       { label: 'C uF', type: 'number', value: p.c, apply: v => { p.c = Math.max(0, Number(v)); } },
+      { label: 'L mH', type: 'number', value: Math.round((p.l || 0) * 1000), apply: v => { p.l = Math.max(0, Number(v)) / 1000; } },
       { label: 'rating A', type: 'number', value: p.rating || 0, apply: v => { p.rating = Math.max(0, Number(v)); } }
     ];
   }

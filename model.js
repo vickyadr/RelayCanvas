@@ -17,7 +17,7 @@ export const KINDS = {
   passive: {
     label: 'Resistor',
     pins: [[0, -PIN_HALF], [0, PIN_HALF]],
-    props: { r: 2400, c: 0, rating: 0, label: '' }
+    props: { r: 2400, c: 0, l: 0, rating: 0, label: '' }
   },
   coil: {
     label: 'Relay',
@@ -180,7 +180,9 @@ export function sanitizeDoc(raw) {
     let n = 2;
     while (usedWireIds.has(id)) id = String(w.id || 'W') + '-' + n++;
     usedWireIds.add(id);
-    wires.push({ id, a, b });
+    const wire = { id, a, b };
+    if (Number.isFinite(Number(w.jog))) wire.jog = Math.round(Number(w.jog));
+    wires.push(wire);
   }
   // drop wires that tap a wire which did not survive validation
   for (let pass = 0; pass < 8; pass++) {
