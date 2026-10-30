@@ -52,6 +52,11 @@ button {
 }
 button:hover { border-color: var(--dead); }
 button.on { border-color: var(--live); color: #062c22; background: var(--live); }
+dialog { background: var(--panel); color: var(--ink); border: 1px solid var(--line); border-radius: 10px; max-width: 460px; padding: 16px; }
+dialog::backdrop { background: rgba(0,0,0,.55); }
+dialog h3 { margin: 0 0 8px; }
+dialog ul { margin: 0 0 12px; padding-left: 18px; }
+dialog li { margin: 4px 0; font-size: 13px; }
 .status { margin-left: auto; color: var(--muted); font-size: 11.5px; }
 .status.bad { color: var(--bad); }
 .status.warn { color: var(--warn); }

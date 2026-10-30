@@ -2,7 +2,7 @@
 // Connection is explicit: a wire runs pin to pin, or pin to a rail tap.
 // Geometry never connects anything by itself, so a rung may cross other rails.
 
-import { KINDS, makePart, partBox, partById, pinsOf, railEnds, railHalf, snap, unrotate } from './model.js';
+import { KINDS, makePart, newId, partBox, partById, pinsOf, railEnds, railHalf, snap, unrotate } from './model.js';
 import { endPoint, pointAlong, render, routePath, wirePolyline } from './render.js';
 
 /** Drop wires whose tap target no longer exists. */
@@ -47,19 +47,31 @@ export class Editor {
     this.selectedId = null;
     this.selectedWire = null;
     this.selection = new Set();
+    this.clipboard = null;
     this.marquee = null;
     this.pan = null;
     this.wireStart = null;
     this.wireDrag = null;
     this.drag = null;
+    this.railResize = null;
     this.sim = null;
     this.ghost = null;
     this.placeProps = null;
     this.history = [];
+    this.zoom = 1;
 
     // middle drag pans the scroll container; also stops the browser autoscroll
     svg.addEventListener('mousedown', (e) => { if (e.button === 1) e.preventDefault(); });
     svg.addEventListener('auxclick', (e) => { if (e.button === 1) e.preventDefault(); });
+    // Ctrl+wheel zooms the canvas; plain wheel keeps scrolling the stage
+    const stage = svg.parentElement;
+    stage.addEventListener('wheel', (e) => {
+      if (!e.ctrlKey) return;
+      e.preventDefault();
+      const factor = e.deltaY < 0 ? 1.1 : 0.9;
+      this.zoom = Math.max(0.5, Math.min(4, this.zoom * factor));
+      this.render();
+    }, { passive: false });
     svg.addEventListener('pointerdown', (e) => this.onDown(e));
     svg.addEventListener('pointermove', (e) => this.onMove(e));
     svg.addEventListener('pointerup', (ev) => this.onUp(ev));
@@ -83,7 +95,7 @@ export class Editor {
 
   point(e) {
     const r = this.svg.getBoundingClientRect();
-    return { x: e.clientX - r.left, y: e.clientY - r.top };
+    return { x: (e.clientX - r.left) / this.zoom, y: (e.clientY - r.top) / this.zoom };
   }
 
   snapshot() {
@@ -102,6 +114,58 @@ export class Editor {
     this.select(null);
   }
 
+  copy() {
+    if (this.selection.size === 0) return;
+    const ids = new Set(this.selection);
+    const parts = this.doc.parts
+      .filter(p => ids.has(p.id))
+      .map(p => ({ ...p, props: { ...p.props } }));
+    const wires = this.doc.wires
+      .filter(w => ids.has(w.a.part) && ids.has(w.b.part) && w.a.pin !== 'wire' && w.b.pin !== 'wire')
+      .map(w => ({ a: { ...w.a }, b: { ...w.b } }));
+    this.clipboard = { parts, wires };
+  }
+
+  paste() {
+    if (!this.clipboard || this.clipboard.parts.length === 0) return;
+    const cb = this.clipboard;
+    this.mutate(doc => {
+      const idMap = new Map();
+      for (const cp of cb.parts) {
+        const oldLabel = (cp.props && cp.props.label) ? String(cp.props.label) : '';
+        // number against what is already on the canvas, so repeated pastes keep
+        // climbing instead of all landing on "(2)"
+        const root = oldLabel.replace(/ \(\d+\)$/, '');
+        let max = 0;
+        for (const p of doc.parts) {
+          const v = (p.props && p.props.label) ? String(p.props.label) : '';
+          if (v === root) max = Math.max(max, 1);
+          const m = v.match(/^(.*) \((\d+)\)$/);
+          if (m && m[1] === root) max = Math.max(max, Number(m[2]));
+        }
+        const newLabel = oldLabel ? (max === 0 ? root : `${root} (${max + 1})`) : '';
+        const np = { ...cp, id: newId(cp.kind, doc), x: cp.x + 20, y: cp.y + 20, props: { ...cp.props, label: newLabel } };
+        idMap.set(cp.id, np.id);
+        doc.parts.push(np);
+      }
+      for (const cw of cb.wires) {
+        const na = { ...cw.a, part: idMap.get(cw.a.part) };
+        const nb = { ...cw.b, part: idMap.get(cw.b.part) };
+        if (!na.part || !nb.part) continue;
+        doc.wires.push({ id: 'W' + doc.wires.length, a: na, b: nb });
+      }
+      this.selection = new Set(idMap.values());
+    });
+  }
+
+  duplicate() { this.copy(); this.paste(); }
+
+  selectAll() {
+    this.selection = new Set(this.doc.parts.map(p => p.id));
+    this.render();
+    if (this.hooks.onSelect) this.hooks.onSelect();
+  }
+
   mutate(fn, opts) {
     if (!opts || !opts.noSnapshot) this.snapshot();
     fn(this.doc);
@@ -116,6 +180,8 @@ export class Editor {
   }
 
   render() {
+    this.svg.setAttribute('width', Math.round(1800 * this.zoom));
+    this.svg.setAttribute('height', Math.round(1100 * this.zoom));
     render(this.svg, this.doc, {
       sim: this.sim,
       selection: [...this.selection],
@@ -177,7 +243,7 @@ export class Editor {
       if (part.kind === 'rail') continue;
       pinsOf(part).forEach((pin, i) => {
         const d = Math.hypot(pt.x - pin.x, pt.y - pin.y);
-        if (d <= 14 && (!best || d < best.d)) best = { part: part.id, pin: i, d };
+        if (d <= 20 && (!best || d < best.d)) best = { part: part.id, pin: i, d };
       });
     }
     return best ? { part: best.part, pin: best.pin } : null;
@@ -197,7 +263,7 @@ export class Editor {
       const px = a.x + dx * u;
       const py = a.y + dy * u;
       const dist = Math.hypot(pt.x - px, pt.y - py);
-      if (dist <= 16 && (!best || dist < best.dist)) best = { part, px, py, dist };
+      if (dist <= 24 && (!best || dist < best.dist)) best = { part, px, py, dist };
     }
     if (!best) return null;
     const half = railHalf(best.part);
@@ -238,7 +304,7 @@ export class Editor {
   endpointAt(pinEl, tapEl, pt, wireEl) {
     if (pinEl) return { part: pinEl.dataset.part, pin: Number(pinEl.dataset.pin) };
     if (wireEl) {
-      const hit = this.wireTapAt(pt, 26);
+      const hit = this.wireTapAt(pt, 32);
       if (hit) return hit;
     }
     if (tapEl) {
@@ -249,7 +315,7 @@ export class Editor {
       const half = railHalf(part);
       return { part: part.id, pin: 'tap', t: Math.max(-half + 4, Math.min(half - 4, snap(local.x))) };
     }
-    return this.nearestPin(pt) || this.wireTapAt(pt, 14) || this.nearestRailTap(pt);
+    return this.nearestPin(pt) || this.wireTapAt(pt, 20) || this.nearestRailTap(pt);
   }
 
   onDown(e) {
@@ -270,6 +336,21 @@ export class Editor {
     if (handleEl && this.tool === 'select') {
       this.wireDrag = { wireId: handleEl.dataset.wire, end: handleEl.dataset.end };
       return;
+    }
+    const railResizeEl = e.target.closest('[data-rail-resize]');
+    if (railResizeEl && this.tool === 'select') {
+      const part = partById(this.doc, railResizeEl.dataset.part);
+      if (part && part.kind === 'rail') {
+        const ends = railEnds(part);
+        const end = railResizeEl.dataset.end;
+        const rot = part.rot || 0;
+        const u = { x: Math.cos(rot * Math.PI / 180), y: Math.sin(rot * Math.PI / 180) };
+        const fixedOpposite = end === 'a'
+          ? { x: ends[1].x, y: ends[1].y }
+          : { x: ends[0].x, y: ends[0].y };
+        this.railResize = { partId: part.id, end, fixedOpposite, u, moved: false };
+        return;
+      }
     }
     if (wireEl && this.tool === 'select') {
       this.selectWire(wireEl.dataset.wire);
@@ -347,6 +428,44 @@ export class Editor {
       this.render();
       return;
     }
+    if (this.railResize) {
+      if (!this.railResize.moved) {
+        this.snapshot();
+        this.railResize.moved = true;
+      }
+      const pt = this.point(e);
+      const rr = this.railResize;
+      const part = partById(this.doc, rr.partId);
+      if (part) {
+        const u = rr.u;
+        const Q = rr.fixedOpposite;
+        let t = rr.end === 'b'
+          ? (pt.x - Q.x) * u.x + (pt.y - Q.y) * u.y
+          : (Q.x - pt.x) * u.x + (Q.y - pt.y) * u.y;
+        t = Math.max(80, Math.round(t / 10) * 10);
+        if (rr.end === 'b') {
+          part.x = snap(Q.x + (t / 2) * u.x);
+          part.y = snap(Q.y + (t / 2) * u.y);
+        } else {
+          part.x = snap(Q.x - (t / 2) * u.x);
+          part.y = snap(Q.y - (t / 2) * u.y);
+        }
+        part.props.len = t;
+      }
+      this.render();
+      return;
+    }
+    if (this.wireDrag) {
+      const wire = this.doc.wires.find(w => w.id === this.wireDrag.wireId);
+      if (wire) {
+        const other = this.wireDrag.end === 'a' ? wire.b : wire.a;
+        const a = endPoint(this.doc, other);
+        const pt = this.point(e);
+        this.ghost = routePath(a, pt);
+      }
+      this.render();
+      return;
+    }
     if (this.marquee) {
       const pt = this.point(e);
       this.marquee.x1 = pt.x;
@@ -367,9 +486,16 @@ export class Editor {
       this.pan = null;
       return;
     }
+    if (this.railResize) {
+      const moved = this.railResize.moved;
+      this.railResize = null;
+      if (moved) this.changed();
+      return;
+    }
     if (this.wireDrag) {
       const { wireId, end } = this.wireDrag;
       this.wireDrag = null;
+      this.ghost = null;
       const pinEl = e && e.target ? e.target.closest('[data-pin]') : null;
       const tapEl = e && e.target ? e.target.closest('[data-tap]') : null;
       const wireEl = e && e.target ? e.target.closest('[data-wire]') : null;
@@ -423,6 +549,7 @@ export class Editor {
 
   onKey(e) {
     const tag = (e.target.tagName || '').toLowerCase();
+    const mod = e.ctrlKey || e.metaKey;
     if (tag === 'input' || tag === 'select') return;
     if (e.key === 'Escape') {
       this.wireStart = null;
@@ -458,9 +585,13 @@ export class Editor {
       this.mutate(() => { part.rot = ((part.rot || 0) + 90) % 360; });
       return;
     }
-    if (e.key === 'w' || e.key === 'W') { this.setTool('wire'); return; }
-    if (e.key === 'v' || e.key === 'V') { this.setTool('select'); return; }
-    if ((e.ctrlKey || e.metaKey) && (e.key === 'z' || e.key === 'Z')) {
+    if (!mod && (e.key === 'w' || e.key === 'W')) { this.setTool('wire'); return; }
+    if (!mod && (e.key === 'v' || e.key === 'V')) { this.setTool('select'); return; }
+    if ((e.ctrlKey || e.metaKey) && (e.key === 'c' || e.key === 'C')) { e.preventDefault(); this.copy(); return; }
+  if ((e.ctrlKey || e.metaKey) && (e.key === 'v' || e.key === 'V')) { e.preventDefault(); this.paste(); return; }
+  if ((e.ctrlKey || e.metaKey) && (e.key === 'd' || e.key === 'D')) { e.preventDefault(); this.duplicate(); return; }
+  if ((e.ctrlKey || e.metaKey) && (e.key === 'a' || e.key === 'A')) { e.preventDefault(); this.selectAll(); return; }
+  if ((e.ctrlKey || e.metaKey) && (e.key === 'z' || e.key === 'Z')) {
       e.preventDefault();
       this.undo();
     }

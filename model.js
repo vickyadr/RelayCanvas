@@ -7,7 +7,7 @@ export const KINDS = {
   rail: {
     label: 'Rail',
     pins: [[-RAIL_HALF, 0], [RAIL_HALF, 0]],
-    props: { v: 24, ac: false, f: 50, rsrc: 0.1, len: 320, label: '' }
+    props: { v: 0, ac: false, f: 50, rsrc: 0.1, len: 320, rating: 0, label: '' }
   },
   switch: {
     label: 'Saklar',

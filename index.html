@@ -15,14 +15,16 @@
     <button data-tool="wire" title="Tarik kabel (W)">Kabel</button>
   </div>
   <div class="group">
-    <button id="run" title="Jalankan simulasi">Run</button>
-    <button id="pause" title="Hentikan sementara, state tetap">Pause</button>
-    <button id="reset" title="Kosongkan hasil">Reset</button>
+    <button id="run" title="Menjalankan simulasi">Run</button>
+    <button id="pause" title="Menghentikan simulasi, state tetap">Pause</button>
+    <button id="reset" title="Mereset simulasi">Reset</button>
   </div>
   <div class="group">
     <button id="save">Simpan</button>
     <button id="load">Muat</button>
+    <button id="export" title="Ekspor kanvas ke PNG">Ekspor</button>
     <button id="demo" title="Muat sketsa acuan">Contoh</button>
+    <button id="help" title="Pintasan dan cara pakai">Bantuan</button>
     <input id="file" type="file" accept=".rly,.json" hidden>
   </div>
   <span id="status" class="status">siap</span>
@@ -31,13 +33,36 @@
 <main>
   <aside id="palette" aria-label="Komponen"></aside>
   <div id="stage">
-    <svg id="canvas" width="1800" height="1100"></svg>
+    <svg id="canvas" width="1800" height="1100" viewBox="0 0 1800 1100"></svg>
   </div>
   <aside id="panel" aria-label="Properti"></aside>
 </main>
 
 <p class="hint">Klik komponen di kiri lalu klik kanvas. Kabel: tombol Kabel, klik pin lalu pin lain. R untuk rotasi, Del hapus, Esc batal. Klik tengah lalu tarik untuk geser kanvas.</p>
 
+<dialog id="helpdlg">
+  <h3>Pintasan dan cara pakai</h3>
+  <ul>
+    <li><b>Klik tombol komponen</b> lalu klik kanvas untuk menaruh.</li>
+    <li><b>Klik</b> komponen untuk memilih, <b>tarik</b> untuk memindah.</li>
+    <li><b>Tarik di area kosong</b> untuk seleksi kotak.</li>
+    <li><b>Klik tengah lalu tarik</b> untuk menggeser kanvas.</li>
+    <li><b>Pilih rail</b> lalu tarik bulatan di ujungnya untuk memanjangkan.</li>
+    <li><b>Ctrl+scroll mouse</b> zoom in/out kanvas (scroll biasa menggulir).</li>
+    <li><b>Ekspor</b> menyimpan kanvas ke PNG.</li>
+    <li><b>R</b> rotasi 90 derajat.</li>
+    <li><b>Del</b> atau <b>Backspace</b> hapus.</li>
+    <li><b>Ctrl+Z</b> undo.</li>
+    <li><b>Ctrl+C</b> / <b>Ctrl+V</b> / <b>Ctrl+D</b> salin, tempel, duplikat.</li>
+    <li><b>Ctrl+A</b> pilih semua.</li>
+    <li><b>W</b> alat kabel, <b>V</b> alat pilih, <b>Esc</b> batal.</li>
+    <li><b>Kabel</b>: alat Kabel, klik pin lalu pin lain. Tap ke rail atau ke kabel lain otomatis.</li>
+    <li><b>Klik saklar</b> sekali untuk menutup atau membuka.</li>
+    <li><b>Run</b> menjalankan simulasi, <b>Pause</b> menghentikan simulasi, <b>Reset</b> mereset simulasi.</li>
+    <li><b>Simpan</b> / <b>Muat</b> berkas <code>.rly</code>.</li>
+  </ul>
+  <button id="helpclose">Tutup</button>
+</dialog>
 <script type="module" src="./main.js"></script>
 </body>
 </html>

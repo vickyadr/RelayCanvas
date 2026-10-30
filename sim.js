@@ -63,6 +63,9 @@ export class Sim {
       if (p.kind === 'rail') {
         const nk = nets.netOf({ part: p.id, pin: 'tap' });
         addNode(nk);
+        const d = this.dev.get(p.id);
+        // a tripped rail is open: it contributes no source, the net falls to 0 V
+        if (d && d.failed) continue;
         const amp = Number(p.props.v) || 0;
         els.push({
           type: 'src',

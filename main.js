@@ -206,6 +206,38 @@ document.getElementById('run').onclick = start;
 document.getElementById('pause').onclick = stop;
 document.getElementById('reset').onclick = reset;
 document.getElementById('demo').onclick = loadDemo;
+document.getElementById('help').onclick = () => document.getElementById('helpdlg').showModal();
+document.getElementById('export').onclick = exportPng;
+
+function exportPng() {
+  const svg = document.getElementById('canvas');
+  const clone = svg.cloneNode(true);
+  let css = '';
+  for (const sheet of document.styleSheets) {
+    try { for (const rule of sheet.cssRules) css += rule.cssText + '\n'; } catch (e) {}
+  }
+  const style = document.createElementNS('http://www.w3.org/2000/svg', 'style');
+  style.textContent = css;
+  clone.insertBefore(style, clone.firstChild);
+  const source = new XMLSerializer().serializeToString(clone);
+  const blob = new Blob([source], { type: 'image/svg+xml;charset=utf-8' });
+  const url = URL.createObjectURL(blob);
+  const img = new Image();
+  img.onload = () => {
+    const canvas = document.createElement('canvas');
+    canvas.width = img.width || svg.clientWidth;
+    canvas.height = img.height || svg.clientHeight;
+    const ctx = canvas.getContext('2d');
+    ctx.drawImage(img, 0, 0);
+    URL.revokeObjectURL(url);
+    const a = document.createElement('a');
+    a.download = 'relaycanvas.png';
+    a.href = canvas.toDataURL('image/png');
+    a.click();
+  };
+  img.src = url;
+}
+document.getElementById('helpclose').onclick = () => document.getElementById('helpdlg').close();
 
 for (const b of document.querySelectorAll('[data-tool]')) {
   b.addEventListener('click', () => {

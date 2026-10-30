@@ -166,16 +166,36 @@ export function render(svg, doc, view) {
       'data-wire': w.id
     }, wireLayer);
     if (v.sim) {
-      const ia = Math.abs(v.sim.amps.get(w.a.part) || 0);
-      const ib = Math.abs(v.sim.amps.get(w.b.part) || 0);
-      if (ia > 1e-6 || ib > 1e-6) path.classList.add('live');
+      const partA = doc.parts.find((p) => p.id === w.a.part);
+      const partB = doc.parts.find((p) => p.id === w.b.part);
+      // a rail's stored current is the whole rail's aggregate, so it must not
+      // light an individual branch that happens to touch it. use the branch
+      // component's current instead, unless the wire runs rail to rail.
+      const bothRails = partA && partA.kind === 'rail' && partB && partB.kind === 'rail';
+      const ia = bothRails
+        ? Math.abs(v.sim.amps.get(w.a.part) || 0)
+        : partA && partA.kind === 'rail'
+          ? 0
+          : Math.abs(v.sim.amps.get(w.a.part) || 0);
+      const ib = bothRails
+        ? Math.abs(v.sim.amps.get(w.b.part) || 0)
+        : partB && partB.kind === 'rail'
+          ? 0
+          : Math.abs(v.sim.amps.get(w.b.part) || 0);
+      const touchesPoweredRail = [w.a, w.b].some((end) => {
+        const part = doc.parts.find((p) => p.id === end.part);
+        if (!part || part.kind !== 'rail') return false;
+        if (part.id && v.sim.dev.get(part.id) && v.sim.dev.get(part.id).failed) return false;
+        return Math.abs(Number(part.props.v) || 0) > 1e-6;
+      });
+      if (touchesPoweredRail || ia > 1e-6 || ib > 1e-6) path.classList.add('live');
     }
     if (selected) {
       for (const [end, pt] of [['a', a], ['b', b]]) {
         node('circle', {
           cx: pt.x,
           cy: pt.y,
-          r: 5,
+          r: 8,
           class: 'handle',
           'data-handle': '1',
           'data-wire': w.id,
@@ -211,6 +231,15 @@ export function render(svg, doc, view) {
     if (!part) continue;
     const box = partBox(part);
     node('rect', { x: box.x, y: box.y, width: box.w, height: box.h, class: 'sel' }, overlay);
+    if (part.kind === 'rail') {
+      const [a, b] = railEnds(part);
+      for (const [end, pt] of [['a', a], ['b', b]]) {
+        node('circle', {
+          cx: pt.x, cy: pt.y, r: 6, class: 'handle',
+          'data-rail-resize': '1', 'data-part': part.id, 'data-end': end
+        }, overlay);
+      }
+    }
   }
   if (v.marquee) {
     const m = v.marquee;
@@ -315,7 +344,12 @@ function drawPart(layer, doc, part, view) {
     'data-part': part.id,
     ...(part.kind === 'rail' ? { 'data-tap': '1' } : {})
   }, g);
-  const live = () => !!(view.sim && Math.abs(view.sim.amps.get(part.id) || 0) > 1e-6);
+  const live = () => {
+    if (!view.sim) return false;
+    const dev = view.sim.dev.get(part.id);
+    if (part.kind === 'coil' && dev && dev.held) return true;
+    return Math.abs(view.sim.amps.get(part.id) || 0) > 1e-6;
+  };
   const failed = view.sim && view.sim.dev.get(part.id) && view.sim.dev.get(part.id).failed;
   const symClass = 'sym' + (live() ? ' live' : '');
   const boxClass = 'box' + (failed ? ' failed' : live() ? ' live' : '');
@@ -349,8 +383,18 @@ function drawPart(layer, doc, part, view) {
   if (part.kind === 'coil') {
     const dev = view.sim ? view.sim.dev.get(part.id) : null;
     const on = dev ? dev.on : false;
+    const held = dev ? !!dev.held : false;
+    // off-delay keeps the output working after the coil drops, so show the
+    // relay as still on while it is being held
+    const energized = on || held;
+    const ton = Number(part.props.ton) > 0;
+    const toff = Number(part.props.toff) > 0;
     const box = node('rect', { x: -23, y: -16, width: 46, height: 32, rx: 4, class: boxClass }, g);
-    if (Number(part.props.ton) > 0) box.setAttribute('stroke-dasharray', '4 3');
+    // distinguish timer relays by their box outline: solid = standard,
+    // dashed = on-delay, dotted = off-delay, dash-dot = on+off delay
+    if (ton && toff) box.setAttribute('stroke-dasharray', '6 2 2 2');
+    else if (ton) box.setAttribute('stroke-dasharray', '4 3');
+    else if (toff) box.setAttribute('stroke-dasharray', '2 2');
     node('path', { d: 'M -13 8 q 6.5 -16 13 0 q 6.5 -16 13 0', class: symClass }, g);
     const t = node('text', { x: 29, y: -6, class: 'label' }, g);
     t.textContent = part.props.label || part.id;
@@ -360,7 +404,7 @@ function drawPart(layer, doc, part, view) {
     }
     if (view.sim) {
       const val = node('text', { x: 29, y: 26, class: 'value' }, g);
-      val.textContent = (on ? 'ON ' : 'off ') + fmtV(view.sim.volts.get(part.id) || 0);
+      val.textContent = (energized ? 'ON ' : 'off ') + fmtV(view.sim.volts.get(part.id) || 0);
     }
   }
 

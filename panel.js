@@ -121,7 +121,8 @@ function fieldDefs(part, doc, editor) {
       { label: 'AC', type: 'check', value: p.ac, apply: v => { p.ac = !!v; } },
       { label: 'f Hz', type: 'number', value: p.f || 50, apply: v => { p.f = Math.max(1, Number(v)); } },
       { label: 'panjang', type: 'number', value: p.len || 320, apply: v => { p.len = Math.max(80, Math.round(Number(v))); } },
-      { label: 'Rsrc', type: 'number', value: p.rsrc, apply: v => { p.rsrc = Math.max(0.001, Number(v)); } }
+      { label: 'Rsrc', type: 'number', value: p.rsrc, apply: v => { p.rsrc = Math.max(0.001, Number(v)); } },
+      { label: 'rating A', type: 'number', value: p.rating || 0, apply: v => { p.rating = Math.max(0, Number(v)); } }
     ];
   }
 
