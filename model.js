@@ -7,17 +7,17 @@ export const KINDS = {
   rail: {
     label: 'Rail',
     pins: [[-RAIL_HALF, 0], [RAIL_HALF, 0]],
-    props: { v: 0, ac: false, f: 50, rsrc: 0.1, len: 320, rating: 0, label: '' }
+    props: { v: 0, ac: false, f: 50, n: false, owner: '', rsrc: 0.1, len: 320, rating: 0, label: '' }
   },
   switch: {
     label: 'Saklar',
     pins: [[0, -PIN_HALF], [0, PIN_HALF]],
-    props: { closed: false, owner: '', nc: false, label: '' }
+    props: { closed: false, owner: '', nc: false, arc: 0, bounce: 0, label: '' }
   },
   passive: {
     label: 'Resistor',
     pins: [[0, -PIN_HALF], [0, PIN_HALF]],
-    props: { r: 2400, c: 0, l: 0, rating: 0, label: '' }
+    props: { r: 2400, c: 0, l: 0, rating: 0, ratingW: 0, label: '' }
   },
   coil: {
     label: 'Relay',
@@ -33,7 +33,27 @@ export const KINDS = {
     label: 'LED',
     pins: [[0, -PIN_HALF], [0, PIN_HALF]],
     props: { r: 1200, rating: 0, label: '' }
-  }
+  },
+  diode: {
+    label: 'Dioda',
+    pins: [[0, -PIN_HALF], [0, PIN_HALF]],
+    props: { vf: 0.7, ron: 1, rating: 0, label: '' }
+  },
+  thyristor: {
+    label: 'Thyristor',
+    pins: [[0, -18], [0, 18], [18, 0]],
+    props: { ron: 0.01, vgt: 0.7, ih: 0.005, rating: 0, label: '' }
+  },
+  label: {
+    label: 'Label',
+    pins: [],
+    props: { text: 'note', label: '' }
+  },
+  triac: {
+    label: 'TRIAC',
+    pins: [[0, -18], [0, 18], [18, 0]],
+    props: { ron: 0.01, vgt: 0.7, ih: 0.005, rating: 0, label: '' }
+  },
 };
 
 /** Rotate a local point around the part origin. */
@@ -107,7 +127,7 @@ export function newDoc() {
 
 let counter = 0;
 export function newId(kind, doc) {
-  const prefix = kind === 'rail' ? 'R' : kind === 'coil' ? 'K' : kind === 'switch' ? 'S' : kind === 'out' ? 'O' : 'X';
+  const prefix = kind === 'rail' ? 'R' : kind === 'coil' ? 'K' : kind === 'switch' ? 'S' : kind === 'out' ? 'O' : kind === 'label' ? 'L' : 'X';
   let n = ++counter;
   let id = prefix + n;
   while (doc.parts.some(p => p.id === id)) id = prefix + (++n);
@@ -165,7 +185,8 @@ export function sanitizeDoc(raw) {
       const local = unrotate(Number(e.x) - part.x, Number(e.y) - part.y, part.rot || 0);
       return { part: e.part, pin: 'tap', t: local.x };
     }
-    if (!Number.isInteger(Number(e.pin)) || Number(e.pin) < 0 || Number(e.pin) > 1) return null;
+    const maxPin = (byId.get(e.part) && KINDS[byId.get(e.part).kind] && KINDS[byId.get(e.part).kind].pins) ? KINDS[byId.get(e.part).kind].pins.length - 1 : 1;
+    if (!Number.isInteger(Number(e.pin)) || Number(e.pin) < 0 || Number(e.pin) > maxPin) return null;
     return { part: e.part, pin: Number(e.pin) };
   };
   const wires = [];

@@ -215,13 +215,18 @@ export function render(svg, doc, view) {
         return Math.abs(Number(part.props.v) || 0) > 1e-6;
       });
       if (touchesPoweredRail || ia > 1e-6 || ib > 1e-6) path.classList.add('live');
+      const partAFailed = !!(partA && partA.kind !== 'rail' && v.sim.dev.get(partA.id) && v.sim.dev.get(partA.id).failed);
+      const partBFailed = !!(partB && partB.kind !== 'rail' && v.sim.dev.get(partB.id) && v.sim.dev.get(partB.id).failed);
+      const railToRail = !!(partA && partA.kind === 'rail' && partB && partB.kind === 'rail');
+      const railFailed = railToRail && ((partA && v.sim.dev.get(partA.id) && v.sim.dev.get(partA.id).failed) || (partB && v.sim.dev.get(partB.id) && v.sim.dev.get(partB.id).failed));
+      if (ia > 50 || ib > 50 || partAFailed || partBFailed || railFailed || (view.sim && view.sim.flags.shortWireIds && view.sim.flags.shortWireIds.has(w.id))) path.classList.add('short');
     }
     if (selected) {
       for (const [end, pt] of [['a', a], ['b', b]]) {
         node('circle', {
           cx: pt.x,
           cy: pt.y,
-          r: 8,
+          r: 12,
           class: 'handle',
           'data-handle': '1',
           'data-wire': w.id,
@@ -390,13 +395,22 @@ function drawPart(layer, doc, part, view) {
     return Math.abs(view.sim.amps.get(part.id) || 0) > 1e-6;
   };
   const failed = view.sim && view.sim.dev.get(part.id) && view.sim.dev.get(part.id).failed;
-  const symClass = 'sym' + (live() ? ' live' : '');
-  const boxClass = 'box' + (failed ? ' failed' : live() ? ' live' : '');
+  const shorted = !!(view.sim && view.sim.flags.shortPartIds && view.sim.flags.shortPartIds.has(part.id));
+  const symClass = 'sym' + (live() ? ' live' : '') + (shorted ? ' short' : '');
+  const boxClass = 'box' + (failed ? ' failed' : live() ? ' live' : '') + (shorted ? ' short' : '');
+
+  if (part.kind === 'label') {
+    const text = node('text', { x: 0, y: 0, class: 'label' }, g);
+    text.textContent = part.props.text || part.props.label || part.id;
+    return;
+  }
 
   if (part.kind === 'rail') {
-    node('line', { x1: -half, y1: 0, x2: half, y2: 0, class: 'rail' }, g);
+    node('line', { x1: -half, y1: 0, x2: half, y2: 0, class: 'rail' + (failed ? ' failed' : '') }, g);
     const label = node('text', { x: -half, y: -9, class: 'label' }, g);
-    label.textContent = `${part.props.label || part.id}  ${part.props.v} ${part.props.ac ? 'VAC ' + part.props.f + ' Hz' : 'VDC'}`;
+    label.textContent = part.props.ac
+      ? `${part.props.label || part.id}  ${part.props.n ? 'N' : 'L'}${part.props.owner ? ' ' + part.props.owner : ''}${part.props.n ? '' : ' ' + part.props.v + ' VAC ' + (part.props.f || 50) + ' Hz'}`
+      : `${part.props.label || part.id}  ${part.props.v} VDC`;
   }
 
   if (part.kind === 'switch') {
@@ -484,6 +498,36 @@ function drawPart(layer, doc, part, view) {
       const val = node('text', { x: 24, y: 9, class: 'value' }, g);
       val.textContent = fmtI(view.sim.amps.get(part.id) || 0);
     }
+  }
+
+  if (part.kind === 'diode') {
+    node('line', { x1: 0, y1: -18, x2: 0, y2: -12, class: symClass }, g);
+    node('path', { d: 'M -11 -12 L 11 -12 L 0 6 Z', class: symClass }, g);
+    node('line', { x1: -11, y1: 6, x2: 11, y2: 6, class: symClass }, g);
+    node('line', { x1: 0, y1: 6, x2: 0, y2: 18, class: symClass }, g);
+    const t = node('text', { x: 18, y: -4, class: 'label' }, g);
+    t.textContent = part.props.label || part.id;
+    if (view.sim) {
+      const val = node('text', { x: 18, y: 9, class: 'value' }, g);
+      val.textContent = fmtI(view.sim.amps.get(part.id) || 0);
+    }
+  }
+
+  if (part.kind === 'thyristor' || part.kind === 'triac') {
+    const triac = part.kind === 'triac';
+    node('line', { x1: 0, y1: -18, x2: 0, y2: -11, class: symClass }, g);
+    node('line', { x1: 0, y1: 6, x2: 0, y2: 18, class: symClass }, g);
+    // main conduction symbol
+    node('path', { d: 'M -11 -11 L 11 -11 L 0 6 Z', class: symClass }, g);
+    node('line', { x1: -11, y1: 6, x2: 11, y2: 6, class: symClass }, g);
+    if (triac) {
+      node('path', { d: 'M 11 6 L -11 6 L 0 -11 Z', class: symClass }, g);
+    }
+    // gate lead to pin 2 (local 18,0)
+    node('line', { x1: 8, y1: 6, x2: 18, y2: 0, class: symClass }, g);
+    node('circle', { cx: 18, cy: 0, r: 2.4, class: 'dot' }, g);
+    const t = node('text', { x: 24, y: -4, class: 'label' }, g);
+    t.textContent = part.props.label || part.id;
   }
 
   if (part.kind === 'out') {

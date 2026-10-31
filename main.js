@@ -24,10 +24,20 @@ const svg = document.getElementById('canvas');
 const palette = document.getElementById('palette');
 const panelEl = document.getElementById('panel');
 const statusEl = document.getElementById('status');
+const stage = document.getElementById('stage');
+function pinStatus() {
+  if (!statusEl || !stage) return;
+  const r = stage.getBoundingClientRect();
+  statusEl.style.right = (window.innerWidth - r.right + 8) + 'px';
+  statusEl.style.top = (r.top + 8) + 'px';
+  statusEl.style.left = 'auto';
+}
+window.addEventListener('resize', pinStatus);
+stage.addEventListener('scroll', pinStatus);
 
 const PALETTE = [
-  { kind: 'rail', label: 'Rail 24 V', props: { v: 24 } },
-  { kind: 'rail', label: 'Rail 0 V', props: { v: 0 } },
+  { kind: 'rail', label: 'Rail DC', props: { v: 24, ac: false } },
+  { kind: 'rail', label: 'Rail AC', props: { v: 220, ac: true, f: 50 } },
   { kind: 'switch', label: 'Saklar' },
   { kind: 'coil', label: 'Relay' },
   { kind: 'passive', label: 'Resistor' },
@@ -35,7 +45,14 @@ const PALETTE = [
   { kind: 'passive', label: 'Induktor', props: { r: 0, c: 0, l: 0.1 } },
   { kind: 'passive', label: 'Jumper', props: { r: 0, c: 0 } },
   { kind: 'led', label: 'LED' },
-  { kind: 'out', label: 'Output' }
+  { kind: 'diode', label: 'Dioda' },
+  /* ----------------- NEED FIX
+   * Access via config is posible
+   * { kind: 'thyristor', label: 'Thyristor' },
+   * { kind: 'triac', label: 'TRIAC' },
+   */
+  { kind: 'out', label: 'Output' },
+  { kind: 'label', label: 'Label' }
 ];
 
 let doc = load() || starter();
@@ -119,6 +136,7 @@ function buildPalette() {
     localStorage.setItem('relaycanvas.palette.minimized', next);
     palette.textContent = '';
     buildPalette();
+    if (window.pinStatus) window.pinStatus();
   });
   header.append(toggle);
   palette.append(header);
@@ -160,12 +178,14 @@ function start() {
   lastTs = 0;
   acc = 0;
   document.getElementById('run').classList.add('on');
+  document.getElementById('pause').classList.remove('on');
   requestAnimationFrame(frame);
 }
 
 function stop() {
   running = false;
   document.getElementById('run').classList.remove('on');
+  document.getElementById('pause').classList.add('on');
   setStatus(sim ? 'pause di ' + sim.t.toFixed(2) + ' s' : 'siap');
 }
 
@@ -183,6 +203,7 @@ function reset() {
   sim = null;
   editor.sim = null;
   document.getElementById('run').classList.remove('on');
+  document.getElementById('pause').classList.remove('on');
   editor.render();
   setStatus('siap');
 }
@@ -209,7 +230,9 @@ function frame(ts) {
     lastPaint = ts;
     editor.render();
     const hint = circuitHint();
-    if (hint) {
+    if (sim.flags.short) {
+      setStatus('t ' + sim.t.toFixed(2) + ' s  Imaks ' + fmtI(sim.flags.maxI) + '  SHORT', 'fail');
+    } else if (hint) {
       setStatus(hint, 'warn');
     } else {
       let text = 't ' + sim.t.toFixed(2) + ' s  Imaks ' + fmtI(sim.flags.maxI);
@@ -258,6 +281,8 @@ function starter() {
 buildPalette();
 markTools();
 renderPanel(panelEl, doc, editor);
+pinStatus();
+window.pinStatus = pinStatus;
 
 // debug handle, used by the browser smoke test
 window.rc = {

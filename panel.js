@@ -10,6 +10,7 @@ export function renderPanel(root, doc, editor) {
   root.classList.toggle('minimized', minimized);
   const part = editor.selectedId ? partById(doc, editor.selectedId) : null;
   const count = editor.selection ? editor.selection.size : 0;
+  const titleText = count > 1 ? count + ' komponen' : part ? part.kind + ' ' + part.id : (editor.selectedWire ? 'kabel ' + editor.selectedWire : 'Properti');
 
   const header = document.createElement('div');
   header.className = 'panel-header';
@@ -21,7 +22,7 @@ export function renderPanel(root, doc, editor) {
 
   const title = document.createElement('h2');
   title.style.margin = '0';
-  title.textContent = count > 1 ? count + ' komponen' : part ? part.kind + ' ' + part.id : 'Properti';
+  title.textContent = titleText;
   header.append(title);
 
   const toggle = document.createElement('button');
@@ -43,6 +44,7 @@ export function renderPanel(root, doc, editor) {
     const next = localStorage.getItem('relaycanvas.panel.minimized') === '1' ? '0' : '1';
     localStorage.setItem('relaycanvas.panel.minimized', next);
     renderPanel(root, doc, editor);
+    if (window.pinStatus) window.pinStatus();
   });
   header.append(toggle);
   root.append(header);
@@ -73,14 +75,30 @@ export function renderPanel(root, doc, editor) {
   }
 
   if (!part) {
-    const p = document.createElement('p');
-    p.className = 'empty';
-    p.textContent = 'Belum ada yang dipilih.';
-    root.append(p);
-    const hint = document.createElement('p');
-    hint.className = 'hintline';
-    hint.textContent = 'W alat kabel: klik pin lalu pin lain, atau klik badan rail untuk tap. R rotasi, Del hapus, Ctrl+Z undo. Klik saklar untuk menutup atau membukanya.';
-    root.append(hint);
+    if (!editor.selectedWire) {
+      const p = document.createElement('p');
+      p.className = 'empty';
+      p.textContent = 'Belum ada yang dipilih.';
+      root.append(p);
+      const hint = document.createElement('p');
+      hint.className = 'hintline';
+      hint.textContent = 'W alat kabel: klik pin lalu pin lain, atau klik badan rail untuk tap. R rotasi, Del hapus, Ctrl+Z undo. Klik saklar untuk menutup atau membukanya.';
+      root.append(hint);
+    }
+    if (editor.selectedWire) {
+      const delBtn = document.createElement('button');
+      delBtn.textContent = 'Hapus kabel';
+      delBtn.style.width = '100%';
+      delBtn.style.marginTop = '8px';
+      delBtn.addEventListener('click', () => {
+        editor.mutate(doc => {
+          doc.wires = doc.wires.filter(w => w.id !== editor.selectedWire);
+          pruneWires(doc);
+        });
+        editor.selectWire(null);
+      });
+      root.append(delBtn);
+    }
     return;
   }
 
@@ -139,6 +157,30 @@ export function renderPanel(root, doc, editor) {
     row.append(input);
     root.append(row);
   }
+
+  if (editor.selectedWire || editor.selectedId) {
+    const delBtn = document.createElement('button');
+    delBtn.textContent = 'Hapus';
+    delBtn.style.width = '100%';
+    delBtn.style.marginTop = '8px';
+    delBtn.addEventListener('click', () => {
+      editor.mutate(doc => {
+        if (editor.selectedWire) {
+          doc.wires = doc.wires.filter(w => w.id !== editor.selectedWire);
+          pruneWires(doc);
+        } else if (editor.selectedId) {
+          const ids = new Set([editor.selectedId]);
+          doc.parts = doc.parts.filter(x => !ids.has(x.id));
+          doc.wires = doc.wires.filter(w => !ids.has(w.a.part) && !ids.has(w.b.part));
+          for (const x of doc.parts) if (ids.has(x.props.owner)) x.props.owner = '';
+          pruneWires(doc);
+        }
+      });
+      editor.select(null);
+      editor.selectWire(null);
+    });
+    root.append(delBtn);
+  }
 }
 
 function fieldDefs(part, doc, editor) {
@@ -151,17 +193,35 @@ function fieldDefs(part, doc, editor) {
   ];
 
   if (part.kind === 'rail') {
+    if (p.ac) {
+      return [
+        ...common,
+        { label: 'V', type: 'number', value: p.v, apply: v => { p.v = Number(v); } },
+        ...(p.n ? [] : [{ label: 'f Hz', type: 'number', value: p.f || 50, apply: v => { p.f = Math.max(1, Number(v)); } }]),
+        { label: 'N', type: 'check', value: p.n, apply: v => { p.n = !!v; if (v) p.v = 0; else p.owner = ''; } },
+        ...(p.n ? [{ label: 'owner', type: 'select', value: p.owner || '', options: [{ value: '', label: '-' }, ...doc.parts.filter(x => x.kind === 'rail' && x.id !== part.id && x.props.ac && !x.props.n).map(r => ({ value: r.id, label: r.props.label || r.id }))], apply: v => { p.owner = String(v); } }] : []),
+        { label: 'panjang', type: 'number', value: p.len || 320, apply: v => { p.len = Math.max(80, Math.round(Number(v))); } },
+        { label: 'Rsrc', type: 'number', value: p.rsrc, apply: v => { p.rsrc = Math.max(0.001, Number(v)); } },
+        { label: 'rating A', type: 'number', value: p.rating || 0, apply: v => { p.rating = Math.max(0, Number(v)); } }
+      ];
+    }
     return [
       ...common,
       { label: 'V', type: 'number', value: p.v, apply: v => { p.v = Number(v); } },
-      { label: 'AC', type: 'check', value: p.ac, apply: v => { p.ac = !!v; } },
-      { label: 'f Hz', type: 'number', value: p.f || 50, apply: v => { p.f = Math.max(1, Number(v)); } },
       { label: 'panjang', type: 'number', value: p.len || 320, apply: v => { p.len = Math.max(80, Math.round(Number(v))); } },
       { label: 'Rsrc', type: 'number', value: p.rsrc, apply: v => { p.rsrc = Math.max(0.001, Number(v)); } },
       { label: 'rating A', type: 'number', value: p.rating || 0, apply: v => { p.rating = Math.max(0, Number(v)); } }
     ];
   }
 
+  if (part.kind === 'diode') {
+    return [
+      ...common,
+      { label: 'Vf', type: 'number', value: p.vf, apply: v => { p.vf = Number(v); } },
+      { label: 'Ron', type: 'number', value: p.ron, apply: v => { p.ron = Math.max(0.001, Number(v)); } },
+      { label: 'rating A', type: 'number', value: p.rating || 0, apply: v => { p.rating = Math.max(0, Number(v)); } }
+    ];
+  }
   if (part.kind === 'led') {
     return [
       ...common,
@@ -181,7 +241,11 @@ function fieldDefs(part, doc, editor) {
       } },
       { label: 'owner', type: 'select', value: p.owner || '', options: [{ value: '', label: '-' }, ...coils], apply: v => { p.owner = String(v); } },
       // checked = NC, unchecked = NO
-      { label: 'NC', type: 'check', value: p.nc, apply: v => { p.nc = !!v; p.closed = !!v; } }
+      { label: 'NC', type: 'check', value: p.nc, apply: v => { p.nc = !!v; p.closed = !!v; } },
+      ...(p.owner ? [
+        { label: 'arc ms', type: 'number', value: Math.round((p.arc || 0) * 1000), apply: v => { p.arc = Math.max(0, Number(v)) / 1000; } },
+        { label: 'bounce ms', type: 'number', value: Math.round((p.bounce || 0) * 1000), apply: v => { p.bounce = Math.max(0, Number(v)) / 1000; } }
+      ] : [])
     ];
   }
 
@@ -191,7 +255,8 @@ function fieldDefs(part, doc, editor) {
       { label: 'R', type: 'number', value: p.r, apply: v => { p.r = Math.max(0, Number(v)); } },
       { label: 'C uF', type: 'number', value: p.c, apply: v => { p.c = Math.max(0, Number(v)); } },
       { label: 'L mH', type: 'number', value: Math.round((p.l || 0) * 1000), apply: v => { p.l = Math.max(0, Number(v)) / 1000; } },
-      { label: 'rating A', type: 'number', value: p.rating || 0, apply: v => { p.rating = Math.max(0, Number(v)); } }
+      { label: 'rating A', type: 'number', value: p.rating || 0, apply: v => { p.rating = Math.max(0, Number(v)); } },
+      { label: 'rating W', type: 'number', value: p.ratingW || 0, apply: v => { p.ratingW = Math.max(0, Number(v)); } },
     ];
   }
 
@@ -202,9 +267,26 @@ function fieldDefs(part, doc, editor) {
       { label: 'pickup V', type: 'number', value: p.pickup, apply: v => { p.pickup = Number(v); } },
       { label: 'release V', type: 'number', value: p.release, apply: v => { p.release = Number(v); } },
       // closing is delayed by `ton`, and the whole output can be held by `toff`
-      { label: 'tutup ms', type: 'number', value: Math.round(p.ton * 1000), apply: v => { p.ton = Math.max(0, Number(v)) / 1000; } },
-      { label: 'tahan ms', type: 'number', value: Math.round((p.toff || 0) * 1000), apply: v => { p.toff = Math.max(0, Number(v)) / 1000; } },
+      { label: 'TON ms', type: 'number', value: Math.round(p.ton * 1000), apply: v => { p.ton = Math.max(0, Number(v)) / 1000; } },
+      { label: 'TOFF ms', type: 'number', value: Math.round((p.toff || 0) * 1000), apply: v => { p.toff = Math.max(0, Number(v)) / 1000; } },
       { label: 'rating A', type: 'number', value: p.rating || 0, apply: v => { p.rating = Math.max(0, Number(v)); } }
+    ];
+  }
+
+  if (part.kind === 'thyristor' || part.kind === 'triac') {
+    return [
+      ...common,
+      { label: 'Ron', type: 'number', value: p.ron, apply: v => { p.ron = Math.max(0.001, Number(v)); } },
+      { label: 'Vgt', type: 'number', value: p.vgt, apply: v => { p.vgt = Math.max(0.1, Number(v)); } },
+      { label: 'Ih A', type: 'number', value: p.ih, apply: v => { p.ih = Math.max(0, Number(v)); } },
+      { label: 'rating A', type: 'number', value: p.rating || 0, apply: v => { p.rating = Math.max(0, Number(v)); } }
+    ];
+  }
+
+  if (part.kind === 'label') {
+    return [
+      ...common,
+      { label: 'teks', type: 'text', value: part.props.text || '', apply: v => { part.props.text = String(v); } }
     ];
   }
 

@@ -119,14 +119,21 @@ dialog ul { margin: 0 0 12px; padding-left: 18px; }
 dialog li { margin: 4px 0; font-size: 13px; }
 
 .status {
-  margin-left: auto;
-  color: var(--muted);
-  font-size: 11.5px;
+  position: fixed;
+  top: 8px;
+  right: 8px;
+  z-index: 100;
+  margin: 0;
+  padding: 0;
+  background: rgba(10,12,14,0.85);
+  color: var(--ink);
+  font-size: 12px;
   font-family: var(--font-mono);
-  align-self: center;
+  white-space: nowrap;
+  min-width: 150px;
+  text-align: right;
 }
-.status.bad { color: var(--ink-2); text-decoration: underline; }
-.status.warn { color: var(--ink-2); }
+.status.fail { color: #f87171; }
 
 main {
   display: grid;
@@ -162,32 +169,40 @@ main {
 }
 
 #stage {
+  position: relative;
   overflow: auto;
   background-color: var(--bg);
   background-image:
     linear-gradient(var(--line) 1px, transparent 1px),
     linear-gradient(90deg, var(--line) 1px, transparent 1px);
   background-size: 20px 20px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
   -webkit-overflow-scrolling: touch;
   touch-action: pan-x pan-y;
 }
-#canvas { display: block; max-width: none; }
+#canvas { display: block; max-width: none; border: 1px dashed rgba(255, 255, 255, 0.35); }
 
 /* SVG canvas styling */
 #canvas .bg { fill: transparent; }
-#canvas .wire { fill: none; stroke: var(--wire); stroke-width: 2.4; stroke-linecap: round; }
+#canvas .wire { fill: none; stroke: var(--wire); stroke-width: 2.4; stroke-linecap: round; touch-action: none; }
 #canvas .wire.live { stroke: var(--live); stroke-width: 3; }
+#canvas .wire.short { stroke: #f87171; stroke-width: 3.2; }
 #canvas .wire.sel { stroke: var(--sel); stroke-dasharray: 6 4; }
 #canvas .handle { fill: var(--panel); stroke: var(--sel); stroke-width: 2; cursor: crosshair; }
 #canvas .rail { fill: none; stroke: var(--rail); stroke-width: 3.6; stroke-linecap: round; }
+#canvas .rail.failed { stroke: #f87171; }
+#canvas .rail.short { stroke: #f87171; }
+#canvas .box.short { stroke: #f87171; }
+#canvas .sym.short { stroke: #f87171; }
 #canvas .sym { fill: none; stroke: var(--ink-3); stroke-width: 2; stroke-linecap: round; }
 #canvas .sym.live { stroke: var(--live); }
 #canvas .box { fill: var(--panel); stroke: var(--ink-3); stroke-width: 2; }
 #canvas .box.live { stroke: var(--live); fill: var(--water-wash); }
-#canvas .box.failed { stroke: var(--ink-2); stroke-dasharray: 4 3; fill: var(--sunken); }
+#canvas .box.failed { stroke: #f87171; stroke-dasharray: 4 3; fill: var(--sunken); }
 #canvas .led-on { fill: var(--water); stroke: var(--water-deep); stroke-width: 2; }
 #canvas .pin { fill: var(--panel); stroke: var(--ink-3); stroke-width: 1.4; }
 #canvas .pin:hover { stroke: var(--ink); fill: var(--sunken); }
+#canvas .hit, #canvas .box, #canvas .sym, #canvas .rail, #canvas .handle { touch-action: none; }
 #canvas .tap { fill: transparent; }
 #canvas .hit { fill: transparent; }
 #canvas .marquee { fill: rgba(63, 209, 199, 0.08); stroke: var(--ink); stroke-width: 1; stroke-dasharray: 4 3; }

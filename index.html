@@ -17,7 +17,6 @@
 <header>
   <button id="menuToggle" class="menu-toggle" type="button" aria-label="Menu" aria-expanded="false">☰</button>
   <h1>RelayCanvas</h1>
-  <span id="status" class="status">siap</span>
   <div id="headerMenu" class="header-menu">
   <div class="group">
     <button data-tool="select" class="on" title="Pilih dan geser (V)">Pilih</button>
@@ -42,7 +41,8 @@
 <main>
   <aside id="palette" aria-label="Komponen"></aside>
   <div id="stage">
-    <svg id="canvas" width="1800" height="1100" viewBox="0 0 1800 1100"></svg>
+    <span id="status" class="status">siap</span>
+    <svg id="canvas" width="3000" height="2000" viewBox="0 0 3000 2000"></svg>
   </div>
   <aside id="panel" aria-label="Properti"></aside>
 </main>
@@ -64,6 +64,7 @@
     <li><b>Ctrl+Z</b> undo.</li>
     <li><b>Ctrl+C</b> / <b>Ctrl+V</b> / <b>Ctrl+D</b> salin, tempel, duplikat.</li>
     <li><b>Ctrl+A</b> pilih semua.</li>
+    <li><b>Label</b> untuk catatan di kanvas; edit teks di panel.</li>
     <li><b>W</b> alat kabel, <b>V</b> alat pilih, <b>Esc</b> batal.</li>
     <li><b>Kabel</b>: alat Kabel, klik pin lalu pin lain. Tap ke rail atau ke kabel lain otomatis.</li>
     <li><b>Klik saklar</b> sekali untuk menutup atau membuka.</li>

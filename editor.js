@@ -190,8 +190,11 @@ export class Editor {
   }
 
   render() {
-    this.svg.setAttribute('width', Math.round(1800 * this.zoom));
-    this.svg.setAttribute('height', Math.round(1100 * this.zoom));
+    const vb = this.svg.viewBox && this.svg.viewBox.baseVal;
+    const baseW = (vb && vb.width) || 3000;
+    const baseH = (vb && vb.height) || 2000;
+    this.svg.setAttribute('width', Math.round(baseW * this.zoom));
+    this.svg.setAttribute('height', Math.round(baseH * this.zoom));
     render(this.svg, this.doc, {
       sim: this.sim,
       selection: [...this.selection],
@@ -254,7 +257,7 @@ export class Editor {
       if (part.kind === 'rail') continue;
       pinsOf(part).forEach((pin, i) => {
         const d = Math.hypot(pt.x - pin.x, pt.y - pin.y);
-        if (d <= 20 && (!best || d < best.d)) best = { part: part.id, pin: i, d };
+        if (d <= 30 && (!best || d < best.d)) best = { part: part.id, pin: i, d };
       });
     }
     return best ? { part: best.part, pin: best.pin } : null;
@@ -274,7 +277,7 @@ export class Editor {
       const px = a.x + dx * u;
       const py = a.y + dy * u;
       const dist = Math.hypot(pt.x - px, pt.y - py);
-      if (dist <= 24 && (!best || dist < best.dist)) best = { part, px, py, dist };
+      if (dist <= 36 && (!best || dist < best.dist)) best = { part, px, py, dist };
     }
     if (!best) return null;
     const half = railHalf(best.part);
@@ -315,7 +318,7 @@ export class Editor {
   endpointAt(pinEl, tapEl, pt, wireEl) {
     if (pinEl) return { part: pinEl.dataset.part, pin: Number(pinEl.dataset.pin) };
     if (wireEl) {
-      const hit = this.wireTapAt(pt, 32);
+      const hit = this.wireTapAt(pt, 48);
       if (hit) return hit;
     }
     if (tapEl) {
@@ -326,10 +329,11 @@ export class Editor {
       const half = railHalf(part);
       return { part: part.id, pin: 'tap', t: Math.max(-half + 4, Math.min(half - 4, snap(local.x))) };
     }
-    return this.nearestPin(pt) || this.wireTapAt(pt, 20) || this.nearestRailTap(pt);
+    return this.nearestPin(pt) || this.wireTapAt(pt, 32) || this.nearestRailTap(pt);
   }
 
   onDown(e) {
+    if (e.pointerType === 'touch') e.preventDefault();
     if (e.button === 1) {
       e.preventDefault();
       const stage = this.svg.parentElement;
@@ -424,6 +428,7 @@ export class Editor {
   }
 
   onMove(e) {
+    if (e.pointerType === 'touch') e.preventDefault();
     if (this.pan) {
       const stage = this.svg.parentElement;
       stage.scrollLeft = this.pan.left - (e.clientX - this.pan.x);
@@ -553,7 +558,7 @@ export class Editor {
         this.changed();
         return;
       }
-      if (first && first.kind === 'switch' && !first.props.owner) {
+      if (first && first.kind === 'switch' && !first.props.owner && !(this.sim && this.sim.dev.get(first.id) && this.sim.dev.get(first.id).failed)) {
         this.toggleSwitch(first);
         return;
       }

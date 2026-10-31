@@ -1,3 +1,5 @@
+import { KINDS } from './model.js';
+
 // Nets are built from explicit pin connections only. Wires that cross a rail
 // geometrically do not connect, so a rung can run from RAIL1 to RAIL4 over
 // RAIL2 and RAIL3 without touching them.
@@ -47,8 +49,8 @@ export function buildNets(doc) {
   for (const p of doc.parts) {
     if (p.kind === 'rail') uf.add(p.id + ':tap');
     else {
-      uf.add(p.id + ':0');
-      uf.add(p.id + ':1');
+      const nPins = (KINDS[p.kind] && KINDS[p.kind].pins && KINDS[p.kind].pins.length) || 2;
+      for (let i = 0; i < nPins; i++) uf.add(p.id + ':' + i);
     }
   }
   for (const w of doc.wires) {
